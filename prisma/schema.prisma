@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+/** Configuração única (id = 1) — dados da empresa exibidos no formulário de reembolso. */
+model CompanySettings {
+  id        Int      @id @default(1)
+  name      String
+  address   String
+  cnpj      String
+  email     String
+  updatedAt DateTime @updatedAt
+}
+
+model Reimbursement {
+  id                Int          @id @default(autoincrement())
+  ownerGoogleSub    String?
+  requesterName     String
+  requesterAddress  String?
+  requesterDocument String
+  requesterEmail    String
+  status            String       @default("enviado")
+  totalAmount       Float
+  createdAt         DateTime     @default(now())
+  expenses          Expense[]
+  attachments       Attachment[]
+}
+
+model Expense {
+  id              Int           @id @default(autoincrement())
+  reimbursementId Int
+  reimbursement   Reimbursement @relation(fields: [reimbursementId], references: [id], onDelete: Cascade)
+  description     String
+  expenseLine     String
+  accountCode     String?
+  amount          Float
+  attachments     Attachment[]
+}
+
+model Attachment {
+  id              Int           @id @default(autoincrement())
+  reimbursementId Int
+  reimbursement   Reimbursement @relation(fields: [reimbursementId], references: [id], onDelete: Cascade)
+  expenseId       Int?
+  expense         Expense?      @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  originalName    String
+  storedPath      String
+  mimeType        String
+  size            Int
+}

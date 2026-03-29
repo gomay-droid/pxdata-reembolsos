@@ -1,0 +1,1085 @@
+================================================================================
+  PX DATA - Sistema de Reembolsos - Código Fonte Completo
+================================================================================
+
+--------------------------------------------------------------------------------
+📄 CSS - Design System
+   Arquivo: src/index.css
+--------------------------------------------------------------------------------
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 99%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    --primary: 262 60% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 10%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 262 40% 95%;
+    --accent-foreground: 262 60% 40%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 60% 50%;
+
+    --radius: 1rem;
+
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 70% 50%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 262 60% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 40% 95%;
+    --sidebar-accent-foreground: 262 60% 40%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 262 60% 50%;
+  }
+
+  .dark {
+    --background: 220 20% 6%;
+    --foreground: 0 0% 95%;
+
+    --card: 220 20% 8%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 20% 8%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 262 60% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 14%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 220 14% 14%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 262 30% 18%;
+    --accent-foreground: 262 60% 75%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 220 14% 18%;
+    --input: 220 14% 18%;
+    --ring: 262 60% 60%;
+
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 262 60% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 30% 18%;
+    --sidebar-accent-foreground: 262 60% 75%;
+    --sidebar-border: 220 14% 18%;
+    --sidebar-ring: 262 60% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-light antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply tracking-tight;
+  }
+}
+
+@layer utilities {
+  .shadow-refined {
+    box-shadow:
+      0 1px 2px 0 rgba(0, 0, 0, 0.04),
+      0 2px 4px 0 rgba(0, 0, 0, 0.04),
+      0 4px 8px 0 rgba(0, 0, 0, 0.04);
+  }
+
+  .shadow-refined-lg {
+    box-shadow:
+      0 2px 4px 0 rgba(0, 0, 0, 0.06),
+      0 8px 16px 0 rgba(0, 0, 0, 0.06),
+      0 16px 32px 0 rgba(0, 0, 0, 0.06);
+  }
+}
+
+
+--------------------------------------------------------------------------------
+📄 Tailwind Config
+   Arquivo: tailwind.config.ts
+--------------------------------------------------------------------------------
+import type { Config } from "tailwindcss";
+
+export default {
+  darkMode: ["class"],
+  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;
+
+
+--------------------------------------------------------------------------------
+📄 Types & Constants
+   Arquivo: src/types/reimbursement.ts
+--------------------------------------------------------------------------------
+export interface Expense {
+  id: number;
+  description: string;
+  expenseLine: string;
+  accountCode: string;
+  amount: string;
+}
+
+export interface ReimbursementFormData {
+  requesterName: string;
+  requesterAddress: string;
+  requesterDocument: string;
+  requesterEmail: string;
+  expenses: Expense[];
+  attachments: File[];
+}
+
+export interface Reimbursement {
+  id: string;
+  requesterName: string;
+  requesterEmail: string;
+  totalAmount: number;
+  expenseCount: number;
+  status: "enviado" | "aprovado" | "rejeitado";
+  createdAt: string;
+}
+
+export const CLIENT_DATA = {
+  name: "PX Data Tecnologia em Informática LTDA",
+  address: "Rua Visconde de Inhaúma, 134 - Sala 1801, Centro, Rio de Janeiro - RJ, CEP 20091-007",
+  cnpj: "24.602.118/0001-58",
+  email: "backoffice@pxdata.ai",
+};
+
+export const EXPENSE_LINES = [
+  "Viagem",
+  "Alimentação",
+  "Transporte",
+  "Hospedagem",
+  "Material de escritório",
+  "Software/Assinatura",
+  "Comunicação",
+  "Outros",
+];
+
+export const ACCOUNT_CODES = [
+  "4.1.01 - Despesas com viagens",
+  "4.1.02 - Despesas com alimentação",
+  "4.1.03 - Despesas com transporte",
+  "4.1.04 - Despesas com hospedagem",
+  "4.1.05 - Despesas administrativas",
+  "4.1.06 - Despesas com tecnologia",
+  "4.1.07 - Despesas com comunicação",
+  "4.1.99 - Outras despesas",
+];
+
+
+--------------------------------------------------------------------------------
+📄 Mock Data
+   Arquivo: src/data/mockReimbursements.ts
+--------------------------------------------------------------------------------
+import { Reimbursement } from "@/types/reimbursement";
+
+export const mockReimbursements: Reimbursement[] = [
+  {
+    id: "REIMB-001",
+    requesterName: "João Silva",
+    requesterEmail: "joao@pxdata.ai",
+    totalAmount: 1250.0,
+    expenseCount: 3,
+    status: "aprovado",
+    createdAt: "2024-03-15",
+  },
+  {
+    id: "REIMB-002",
+    requesterName: "Maria Santos",
+    requesterEmail: "maria@pxdata.ai",
+    totalAmount: 890.5,
+    expenseCount: 2,
+    status: "enviado",
+    createdAt: "2024-03-18",
+  },
+  {
+    id: "REIMB-003",
+    requesterName: "Carlos Oliveira",
+    requesterEmail: "carlos@pxdata.ai",
+    totalAmount: 3200.0,
+    expenseCount: 5,
+    status: "rejeitado",
+    createdAt: "2024-03-20",
+  },
+  {
+    id: "REIMB-004",
+    requesterName: "Ana Costa",
+    requesterEmail: "ana@pxdata.ai",
+    totalAmount: 450.75,
+    expenseCount: 1,
+    status: "enviado",
+    createdAt: "2024-03-22",
+  },
+];
+
+
+--------------------------------------------------------------------------------
+📄 Hook - Form Logic
+   Arquivo: src/hooks/useReimbursementForm.ts
+--------------------------------------------------------------------------------
+import { useState, useCallback } from "react";
+import { Expense, ReimbursementFormData } from "@/types/reimbursement";
+
+const createEmptyExpense = (id: number): Expense => ({
+  id,
+  description: "",
+  expenseLine: "",
+  accountCode: "",
+  amount: "",
+});
+
+export function useReimbursementForm() {
+  const [formData, setFormData] = useState<ReimbursementFormData>({
+    requesterName: "",
+    requesterAddress: "",
+    requesterDocument: "",
+    requesterEmail: "",
+    expenses: [createEmptyExpense(1)],
+    attachments: [],
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const updateField = useCallback(
+    (field: keyof Omit<ReimbursementFormData, "expenses" | "attachments">, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    },
+    []
+  );
+
+  const addExpense = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      expenses: [...prev.expenses, createEmptyExpense(prev.expenses.length + 1)],
+    }));
+  }, []);
+
+  const removeExpense = useCallback((id: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.filter((e) => e.id !== id).map((e, i) => ({ ...e, id: i + 1 })),
+    }));
+  }, []);
+
+  const updateExpense = useCallback(
+    (id: number, field: keyof Omit<Expense, "id">, value: string) => {
+      setFormData((prev) => ({
+        ...prev,
+        expenses: prev.expenses.map((e) => (e.id === id ? { ...e, [field]: value } : e)),
+      }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[`expense_${id}_${field}`];
+        return next;
+      });
+    },
+    []
+  );
+
+  const addAttachments = useCallback((files: FileList) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...Array.from(files)],
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next["attachments"];
+      return next;
+    });
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  const validate = useCallback((): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.requesterName.trim()) newErrors.requesterName = "Nome é obrigatório";
+    if (!formData.requesterEmail.trim()) newErrors.requesterEmail = "Email é obrigatório";
+    if (!formData.requesterDocument.trim()) newErrors.requesterDocument = "CPF/CNPJ é obrigatório";
+
+    formData.expenses.forEach((e) => {
+      if (!e.description.trim()) newErrors[`expense_${e.id}_description`] = "Obrigatório";
+      if (!e.expenseLine) newErrors[`expense_${e.id}_expenseLine`] = "Obrigatório";
+      if (!e.amount || parseFloat(e.amount) <= 0) newErrors[`expense_${e.id}_amount`] = "Valor inválido";
+    });
+
+    if (formData.attachments.length === 0) newErrors.attachments = "Anexe pelo menos um comprovante";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [formData]);
+
+  const totalAmount = formData.expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+  return {
+    formData,
+    errors,
+    totalAmount,
+    updateField,
+    addExpense,
+    removeExpense,
+    updateExpense,
+    addAttachments,
+    removeAttachment,
+    validate,
+  };
+}
+
+
+--------------------------------------------------------------------------------
+📄 Page - Index
+   Arquivo: src/pages/Index.tsx
+--------------------------------------------------------------------------------
+import { useState } from "react";
+import ReimbursementForm from "@/components/reimbursement/ReimbursementForm";
+import { ReimbursementList } from "@/components/reimbursement/ReimbursementList";
+import { mockReimbursements } from "@/data/mockReimbursements";
+import { Button } from "@/components/ui/button";
+import { Plus, List } from "lucide-react";
+
+type View = "form" | "list";
+
+const Index = () => {
+  const [view, setView] = useState<View>("form");
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Top Bar */}
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-xs font-medium text-primary-foreground">PX</span>
+            </div>
+            <span className="text-sm font-medium text-foreground">Reembolsos</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant={view === "form" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setView("form")}
+              className="rounded-xl gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Novo</span>
+            </Button>
+            <Button
+              variant={view === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setView("list")}
+              className="rounded-xl gap-2"
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">Histórico</span>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-4xl mx-auto px-4 md:px-8 py-8 md:py-12">
+        {view === "form" ? (
+          <ReimbursementForm />
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-medium text-foreground tracking-tight">
+                Histórico de Reembolsos
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 font-light">
+                {mockReimbursements.length} solicitações registradas
+              </p>
+            </div>
+            <ReimbursementList reimbursements={mockReimbursements} />
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default Index;
+
+
+--------------------------------------------------------------------------------
+📄 Component - Form
+   Arquivo: src/components/reimbursement/ReimbursementForm.tsx
+--------------------------------------------------------------------------------
+import { useReimbursementForm } from "@/hooks/useReimbursementForm";
+import { RequesterSection } from "@/components/reimbursement/RequesterSection";
+import { ClientDataSection } from "@/components/reimbursement/ClientDataSection";
+import { ExpensesSection } from "@/components/reimbursement/ExpensesSection";
+import { AttachmentsSection } from "@/components/reimbursement/AttachmentsSection";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Send } from "lucide-react";
+
+export default function ReimbursementForm() {
+  const {
+    formData,
+    errors,
+    totalAmount,
+    updateField,
+    addExpense,
+    removeExpense,
+    updateExpense,
+    addAttachments,
+    removeAttachment,
+    validate,
+  } = useReimbursementForm();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) {
+      toast.success("Reembolso enviado com sucesso!", {
+        description: `${formData.expenses.length} despesa(s) totalizando R$ ${totalAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      });
+    } else {
+      toast.error("Preencha todos os campos obrigatórios");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Header Banner */}
+      <div className="rounded-2xl bg-primary p-6 md:p-8">
+        <h1 className="text-2xl md:text-3xl font-medium text-primary-foreground tracking-tight">
+          Solicitação de Reembolso
+        </h1>
+        <p className="text-sm text-primary-foreground/70 mt-1 font-light">
+          Preencha os dados abaixo para registrar sua solicitação
+        </p>
+      </div>
+
+      {/* Client Info */}
+      <ClientDataSection />
+
+      {/* Requester */}
+      <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
+        <RequesterSection
+          name={formData.requesterName}
+          address={formData.requesterAddress}
+          document={formData.requesterDocument}
+          email={formData.requesterEmail}
+          errors={errors}
+          onUpdate={updateField}
+        />
+      </div>
+
+      {/* Expenses */}
+      <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
+        <ExpensesSection
+          expenses={formData.expenses}
+          errors={errors}
+          totalAmount={totalAmount}
+          onAdd={addExpense}
+          onRemove={removeExpense}
+          onUpdate={updateExpense}
+        />
+      </div>
+
+      {/* Attachments */}
+      <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
+        <AttachmentsSection
+          attachments={formData.attachments}
+          error={errors.attachments}
+          onAdd={addAttachments}
+          onRemove={removeAttachment}
+        />
+      </div>
+
+      {/* Submit */}
+      <div className="flex justify-end">
+        <Button
+          type="submit"
+          size="lg"
+          className="rounded-xl gap-2 px-8 h-12 text-base font-medium"
+        >
+          <Send className="h-4 w-4" />
+          Enviar Solicitação
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+
+--------------------------------------------------------------------------------
+📄 Component - Requester
+   Arquivo: src/components/reimbursement/RequesterSection.tsx
+--------------------------------------------------------------------------------
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { User } from "lucide-react";
+
+interface Props {
+  name: string;
+  address: string;
+  document: string;
+  email: string;
+  errors: Record<string, string>;
+  onUpdate: (field: "requesterName" | "requesterAddress" | "requesterDocument" | "requesterEmail", value: string) => void;
+}
+
+export function RequesterSection({ name, address, document, email, errors, onUpdate }: Props) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <User className="h-5 w-5 text-accent-foreground" />
+        </div>
+        <div>
+          <h3 className="text-base font-medium text-foreground">Dados do Solicitante</h3>
+          <p className="text-sm text-muted-foreground">Preencha suas informações</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-sm text-muted-foreground">Nome completo *</Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(e) => onUpdate("requesterName", e.target.value)}
+            placeholder="Seu nome completo"
+            className="h-12 rounded-xl bg-secondary border-border font-light"
+          />
+          {errors.requesterName && <p className="text-xs text-destructive">{errors.requesterName}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm text-muted-foreground">Email *</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => onUpdate("requesterEmail", e.target.value)}
+            placeholder="seu@email.com"
+            className="h-12 rounded-xl bg-secondary border-border font-light"
+          />
+          {errors.requesterEmail && <p className="text-xs text-destructive">{errors.requesterEmail}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="document" className="text-sm text-muted-foreground">CPF/CNPJ *</Label>
+          <Input
+            id="document"
+            value={document}
+            onChange={(e) => onUpdate("requesterDocument", e.target.value)}
+            placeholder="000.000.000-00"
+            className="h-12 rounded-xl bg-secondary border-border font-light"
+          />
+          {errors.requesterDocument && <p className="text-xs text-destructive">{errors.requesterDocument}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="address" className="text-sm text-muted-foreground">Endereço</Label>
+          <Input
+            id="address"
+            value={address}
+            onChange={(e) => onUpdate("requesterAddress", e.target.value)}
+            placeholder="Seu endereço"
+            className="h-12 rounded-xl bg-secondary border-border font-light"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+--------------------------------------------------------------------------------
+📄 Component - Client Data
+   Arquivo: src/components/reimbursement/ClientDataSection.tsx
+--------------------------------------------------------------------------------
+import { CLIENT_DATA } from "@/types/reimbursement";
+import { Building2 } from "lucide-react";
+
+export function ClientDataSection() {
+  return (
+    <div className="rounded-2xl bg-accent/50 border border-border p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Building2 className="h-5 w-5 text-accent-foreground" />
+        </div>
+        <div>
+          <h3 className="text-base font-medium text-foreground">Dados do Cliente</h3>
+          <p className="text-sm text-muted-foreground">Informações pré-preenchidas</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground uppercase tracking-wide">Razão Social</span>
+          <p className="text-sm font-normal text-foreground">{CLIENT_DATA.name}</p>
+        </div>
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground uppercase tracking-wide">CNPJ</span>
+          <p className="text-sm font-normal text-foreground">{CLIENT_DATA.cnpj}</p>
+        </div>
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground uppercase tracking-wide">Endereço</span>
+          <p className="text-sm font-normal text-foreground">{CLIENT_DATA.address}</p>
+        </div>
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground uppercase tracking-wide">Email</span>
+          <p className="text-sm font-normal text-foreground">{CLIENT_DATA.email}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+--------------------------------------------------------------------------------
+📄 Component - Expenses
+   Arquivo: src/components/reimbursement/ExpensesSection.tsx
+--------------------------------------------------------------------------------
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Expense, EXPENSE_LINES, ACCOUNT_CODES } from "@/types/reimbursement";
+import { Plus, Trash2, Receipt } from "lucide-react";
+
+interface Props {
+  expenses: Expense[];
+  errors: Record<string, string>;
+  totalAmount: number;
+  onAdd: () => void;
+  onRemove: (id: number) => void;
+  onUpdate: (id: number, field: keyof Omit<Expense, "id">, value: string) => void;
+}
+
+export function ExpensesSection({ expenses, errors, totalAmount, onAdd, onRemove, onUpdate }: Props) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Receipt className="h-5 w-5 text-accent-foreground" />
+          </div>
+          <div>
+            <h3 className="text-base font-medium text-foreground">Itens de Despesa</h3>
+            <p className="text-sm text-muted-foreground">{expenses.length} {expenses.length === 1 ? "item" : "itens"} adicionados</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onAdd}
+          className="rounded-xl gap-2 border-primary/20 text-accent-foreground hover:bg-accent"
+        >
+          <Plus className="h-4 w-4" />
+          Adicionar
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        {expenses.map((expense) => (
+          <div
+            key={expense.id}
+            className="rounded-2xl border border-border bg-card p-5 space-y-4 animate-fade-in transition-all duration-300 hover:shadow-refined"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-primary bg-accent px-3 py-1 rounded-full">
+                Despesa {expense.id}
+              </span>
+              {expenses.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemove(expense.id)}
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2 space-y-2">
+                <Label className="text-sm text-muted-foreground">Descrição *</Label>
+                <Input
+                  value={expense.description}
+                  onChange={(e) => onUpdate(expense.id, "description", e.target.value)}
+                  placeholder="Descreva a despesa"
+                  className="h-12 rounded-xl bg-secondary border-border font-light"
+                />
+                {errors[`expense_${expense.id}_description`] && (
+                  <p className="text-xs text-destructive">{errors[`expense_${expense.id}_description`]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Linha de despesa *</Label>
+                <Select
+                  value={expense.expenseLine}
+                  onValueChange={(v) => onUpdate(expense.id, "expenseLine", v)}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-secondary border-border font-light">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_LINES.map((line) => (
+                      <SelectItem key={line} value={line}>{line}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors[`expense_${expense.id}_expenseLine`] && (
+                  <p className="text-xs text-destructive">{errors[`expense_${expense.id}_expenseLine`]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Conta contábil</Label>
+                <Select
+                  value={expense.accountCode}
+                  onValueChange={(v) => onUpdate(expense.id, "accountCode", v)}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-secondary border-border font-light">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_CODES.map((code) => (
+                      <SelectItem key={code} value={code}>{code}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Valor (R$) *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={expense.amount}
+                  onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
+                  placeholder="0,00"
+                  className="h-12 rounded-xl bg-secondary border-border font-light"
+                />
+                {errors[`expense_${expense.id}_amount`] && (
+                  <p className="text-xs text-destructive">{errors[`expense_${expense.id}_amount`]}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Total */}
+      <div className="flex items-center justify-between rounded-2xl bg-primary/5 border border-primary/10 p-5">
+        <span className="text-sm font-medium text-foreground">Total do Reembolso</span>
+        <span className="text-2xl font-medium text-primary tracking-tight">
+          R$ {totalAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+
+--------------------------------------------------------------------------------
+📄 Component - Attachments
+   Arquivo: src/components/reimbursement/AttachmentsSection.tsx
+--------------------------------------------------------------------------------
+import { useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Upload, X, FileText, Image } from "lucide-react";
+
+interface Props {
+  attachments: File[];
+  error?: string;
+  onAdd: (files: FileList) => void;
+  onRemove: (index: number) => void;
+}
+
+export function AttachmentsSection({ attachments, error, onAdd, onRemove }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Upload className="h-5 w-5 text-accent-foreground" />
+        </div>
+        <div>
+          <h3 className="text-base font-medium text-foreground">Comprovantes</h3>
+          <p className="text-sm text-muted-foreground">PDF ou imagens (obrigatório)</p>
+        </div>
+      </div>
+
+      <div
+        onClick={() => inputRef.current?.click()}
+        className="rounded-2xl border-2 border-dashed border-border hover:border-primary/30 transition-colors duration-300 p-8 text-center cursor-pointer group"
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={(e) => e.target.files && onAdd(e.target.files)}
+          className="hidden"
+        />
+        <Upload className="h-8 w-8 mx-auto text-muted-foreground group-hover:text-primary/60 transition-colors mb-3" />
+        <p className="text-sm text-muted-foreground">
+          Clique ou arraste arquivos aqui
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">PDF, JPG ou PNG</p>
+      </div>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {attachments.length > 0 && (
+        <div className="space-y-2">
+          {attachments.map((file, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between rounded-xl border border-border bg-card p-3 animate-fade-in"
+            >
+              <div className="flex items-center gap-3">
+                {file.type.includes("pdf") ? (
+                  <FileText className="h-5 w-5 text-destructive/70" />
+                ) : (
+                  <Image className="h-5 w-5 text-info" />
+                )}
+                <div>
+                  <p className="text-sm font-normal text-foreground truncate max-w-[200px] md:max-w-[400px]">
+                    {file.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / 1024).toFixed(0)} KB
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onRemove(index)}
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+--------------------------------------------------------------------------------
+📄 Component - List
+   Arquivo: src/components/reimbursement/ReimbursementList.tsx
+--------------------------------------------------------------------------------
+import { Reimbursement } from "@/types/reimbursement";
+import { Badge } from "@/components/ui/badge";
+import { FileText, CheckCircle2, XCircle, Clock } from "lucide-react";
+
+const statusConfig = {
+  enviado: { label: "Enviado", icon: Clock, className: "bg-info/10 text-info border-info/20" },
+  aprovado: { label: "Aprovado", icon: CheckCircle2, className: "bg-success/10 text-success border-success/20" },
+  rejeitado: { label: "Rejeitado", icon: XCircle, className: "bg-destructive/10 text-destructive border-destructive/20" },
+};
+
+interface Props {
+  reimbursements: Reimbursement[];
+}
+
+export function ReimbursementList({ reimbursements }: Props) {
+  return (
+    <div className="space-y-3">
+      {reimbursements.map((r) => {
+        const status = statusConfig[r.status];
+        const StatusIcon = status.icon;
+        return (
+          <div
+            key={r.id}
+            className="rounded-2xl border border-border bg-card p-5 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 hover:shadow-refined cursor-pointer"
+          >
+            <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-accent-foreground" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-foreground">{r.id}</span>
+                <Badge variant="outline" className={`text-xs rounded-full ${status.className}`}>
+                  <StatusIcon className="h-3 w-3 mr-1" />
+                  {status.label}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {r.requesterName} · {r.expenseCount} {r.expenseCount === 1 ? "despesa" : "despesas"}
+              </p>
+            </div>
+
+            <div className="text-right">
+              <p className="text-lg font-medium text-foreground tracking-tight">
+                R$ {r.totalAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(r.createdAt).toLocaleDateString("pt-BR")}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
