@@ -1,12 +1,14 @@
 # Deploy na Vercel (front) + API em outro host
 
 A Vercel serve **apenas o front-end estático** gerado pelo Vite (`npm run build`).  
-A **API Express** (sessão, Prisma, SQLite, uploads em disco) **não roda** como servidor de longa duração na Vercel sem reescrever para serverless.
+A **API Express** (sessão, Prisma, SQLite, uploads em disco) **não roda** na Vercel neste setup.
 
-Arquitetura recomendada:
+**Onde está a API?** No mesmo repositório, pasta `server/` — você sobe em **Railway, Render, etc.** usando o **`Dockerfile`** na raiz. Passo a passo: **[DEPLOY_API.md](./DEPLOY_API.md)**.
+
+Arquitetura:
 
 1. **Vercel** — SPA React (`dist/`).
-2. **Outro provedor** — API Node (ex.: [Railway](https://railway.app), [Render](https://render.com), [Fly.io](https://fly.io), VPS) com **disco persistente** para `prisma/dev.db` (ou `DATABASE_URL` em PostgreSQL) e pasta `uploads/`.
+2. **Outro host** — API via Docker (`Dockerfile`) ou `npm start`, com **volume** para `prisma/dev.db` e `uploads/`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 Documento para **desenvolvedores e operações**: arquitetura, configuração, API, dados e convenções do repositório.
 
-**Relacionado:** [Documentação de produto](./DOCUMENTACAO_PRODUTO.md) · [Deploy Vercel + API](./DEPLOY_VERCEL.md)
+**Relacionado:** [Documentação de produto](./DOCUMENTACAO_PRODUTO.md) · [Deploy Vercel (front)](./DEPLOY_VERCEL.md) · [Deploy da API (Docker / Railway)](./DEPLOY_API.md)
 
 ---
 
