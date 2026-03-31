@@ -1,10 +1,17 @@
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { LoginScreen } from "@/components/auth/LoginScreen";
 import Index from "@/pages/Index";
 import AdminPage from "@/pages/AdminPage";
 import ExtractLabPage from "@/pages/ExtractLabPage";
+import { productionApiBaseMissingMessage } from "@/lib/apiBase";
 
 function RouterTree() {
+  const apiBaseWarn = productionApiBaseMissingMessage();
+  if (apiBaseWarn) {
+    return <LoginScreen configError={apiBaseWarn} onLoggedIn={() => {}} />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
