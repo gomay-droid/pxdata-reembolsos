@@ -29,6 +29,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 const prisma = new PrismaClient();
 const app = express();
+app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT) || 3001;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? "";
