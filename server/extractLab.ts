@@ -210,3 +210,121 @@ export function buildHintsByDocKind(text: string, docKind: string, mime: string)
     manualOnly: false,
   };
 }
+
+export type ExpenseLineExtracted =
+  | "Viagem"
+  | "Alimentação"
+  | "Transporte"
+  | "Hospedagem"
+  | "Material de escritório"
+  | "Software/Assinatura"
+  | "Comunicação"
+  | "Outros";
+
+export type ReceiptExtractionResult = {
+  description: string | null;
+  expenseLine: ExpenseLineExtracted | null;
+  accountCode: string | null;
+  amountBRL: number | null;
+  amountUSD: number | null;
+  supplierCnpj: string | null;
+  confidence: "low" | "medium" | "high";
+};
+
+const EXPENSE_LINE_KEYWORDS: Array<{ line: ExpenseLineExtracted; re: RegExp }> = [
+  { line: "Transporte", re: /\b(uber|99|taxi|cabify|corrida|ped[aá]gio|combust[ií]vel|posto)\b/i },
+  { line: "Alimentação", re: /\b(restaurante|lanchonete|almo[cç]o|jantar|caf[eé]|ifood|food)\b/i },
+  { line: "Hospedagem", re: /\b(hotel|hospedagem|pousada|booking|airbnb|di[aá]ria)\b/i },
+  { line: "Software/Assinatura", re: /\b(license|licen[cç]a|subscription|assinatura|openai|anthropic|google|aws|microsoft)\b/i },
+  { line: "Comunicação", re: /\b(internet|telefone|celular|whatsapp|zoom|meet)\b/i },
+  { line: "Viagem", re: /\b(passagem|voo|a[ée]reo|rodovi[aá]ria|viagem)\b/i },
+  { line: "Material de escritório", re: /\b(papelaria|material|escrit[oó]rio|caneta|impress[aã]o)\b/i },
+];
+
+const ACCOUNT_CODE_BY_LINE: Record<ExpenseLineExtracted, string> = {
+  Viagem: "4.1.01 - Despesas com viagens",
+  Alimentação: "4.1.02 - Despesas com alimentação",
+  Transporte: "4.1.03 - Despesas com transporte",
+  Hospedagem: "4.1.04 - Despesas com hospedagem",
+  "Material de escritório": "4.1.05 - Despesas administrativas",
+  "Software/Assinatura": "4.1.06 - Despesas com tecnologia",
+  Comunicação: "4.1.07 - Despesas com comunicação",
+  Outros: "4.1.99 - Outras despesas",
+};
+
+function normalizeDigits(s: string): string {
+  return s.replace(/\D+/g, "");
+}
+
+function formatCnpjFromText(raw: string): string | null {
+  const digits = normalizeDigits(raw);
+  if (digits.length !== 14) return null;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
+function extractCnpj(text: string): string | null {
+  const m = text.match(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/);
+  if (!m) return null;
+  return formatCnpjFromText(m[0]);
+}
+
+function extractAmountBRL(text: string): number | null {
+  const tokens = [...text.matchAll(/R\$\s*[\d.,]+/gi)].map((m) => m[0]);
+  const numbers = tokens.map((t) => brlToNumber(t)).filter((n): n is number => n !== null && n > 0);
+  if (!numbers.length) return null;
+  return Math.max(...numbers);
+}
+
+function extractAmountUSD(text: string): number | null {
+  const tokens = [
+    ...[...text.matchAll(/US\$\s*[\d.,]+/gi)].map((m) => m[0]),
+    ...[...text.matchAll(/\$\s*[\d,]+\.\d{2}\b/g)].map((m) => m[0]),
+  ];
+  const numbers = tokens.map((t) => usdToNumber(t)).filter((n): n is number => n !== null && n > 0);
+  if (!numbers.length) return null;
+  return Math.max(...numbers);
+}
+
+function inferExpenseLine(text: string): ExpenseLineExtracted {
+  for (const entry of EXPENSE_LINE_KEYWORDS) {
+    if (entry.re.test(text)) return entry.line;
+  }
+  return "Outros";
+}
+
+function inferDescription(text: string, filename: string, line: ExpenseLineExtracted): string {
+  if (/\buber\b/i.test(text)) return "Corrida Uber";
+  if (/ifood/i.test(text)) return "Pedido iFood";
+  if (/\bhotel|airbnb|booking\b/i.test(text)) return "Hospedagem";
+  if (/openai|anthropic|google|aws|microsoft/i.test(text)) return "Assinatura de software";
+  const baseName = filename.replace(/\.[a-z0-9]+$/i, "").trim();
+  if (baseName) return baseName;
+  return line === "Outros" ? "Despesa com comprovante" : `${line} (nota)`;
+}
+
+export function buildReceiptExtraction(text: string, filename: string): ReceiptExtractionResult {
+  const normalized = normalizePdfText(text);
+  const line = inferExpenseLine(normalized);
+  const amountBRL = extractAmountBRL(normalized);
+  const amountUSD = extractAmountUSD(normalized);
+  const supplierCnpj = extractCnpj(normalized);
+  const description = inferDescription(normalized, filename, line);
+  const accountCode = ACCOUNT_CODE_BY_LINE[line] ?? ACCOUNT_CODE_BY_LINE.Outros;
+
+  let confidence: ReceiptExtractionResult["confidence"] = "low";
+  const signals = [amountBRL !== null || amountUSD !== null, Boolean(supplierCnpj), line !== "Outros"].filter(
+    Boolean
+  ).length;
+  if (signals >= 3) confidence = "high";
+  else if (signals === 2) confidence = "medium";
+
+  return {
+    description: description || null,
+    expenseLine: line,
+    accountCode,
+    amountBRL,
+    amountUSD,
+    supplierCnpj,
+    confidence,
+  };
+}

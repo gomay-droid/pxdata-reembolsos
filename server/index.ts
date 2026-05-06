@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { OAuth2Client } from "google-auth-library";
 /// <reference path="./session.d.ts" />
 import { PrismaClient } from "@prisma/client";
-import { buildHintsByDocKind, extractTextFromBuffer } from "./extractLab";
+import { buildHintsByDocKind, buildReceiptExtraction, extractTextFromBuffer } from "./extractLab";
 import {
   adminReimbursementDetailInclude,
   buildAdminExpenseRowsForJson,
@@ -633,6 +633,29 @@ app.post("/api/lab/extract", requireAuth, labUpload.single("file"), async (req, 
     console.error("[lab/extract]", e);
     const msg = e instanceof Error ? e.message : "Falha ao extrair texto";
     res.status(500).json({ error: msg });
+  }
+});
+
+/** Extração estruturada para despesas: descrição, classificação, conta, valores e CNPJ. */
+app.post("/api/receipts/extract", requireAuth, labUpload.single("file"), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: "Envie um arquivo PDF ou imagem (JPEG/PNG)" });
+  }
+  try {
+    const { text, method } = await extractTextFromBuffer(file.buffer, file.mimetype);
+    const extraction = buildReceiptExtraction(text, file.originalname);
+    res.json({
+      extraction,
+      method,
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      canEditManually: true,
+    });
+  } catch (e) {
+    console.error("[receipts/extract]", e);
+    const msg = e instanceof Error ? e.message : "Falha ao extrair dados do comprovante";
+    res.status(500).json({ error: msg, canEditManually: true });
   }
 });
 

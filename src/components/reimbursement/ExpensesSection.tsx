@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { parseAmountFromPdfHints, type LabExtractHints } from "@/lib/parseAmountFromPdfHints";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,9 +10,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Expense, EXPENSE_LINES, ACCOUNT_CODES } from "@/types/reimbursement";
+import { Expense, EXPENSE_LINES, ACCOUNT_CODES, RECEIPT_ACCEPT_ATTR } from "@/types/reimbursement";
 import { DescriptionCombobox } from "@/components/reimbursement/DescriptionCombobox";
-import { ChevronDown, ChevronRight, FileText, Image, Loader2, Plus, Receipt, Trash2, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Image,
+  Loader2,
+  Plus,
+  Receipt,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import { ReceiptBulkUpload, toastBulkUploadSummary } from "@/components/reimbursement/ReceiptBulkUpload";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiUrl } from "@/lib/apiBase";
 
@@ -26,6 +40,26 @@ interface Props {
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onAttachmentChange: (id: number, file: File | null) => void;
+  /** Um arquivo = uma despesa; validação e estado de processamento no hook. */
+  addExpensesFromFiles: (
+    files: File[]
+  ) => { added: number; errors: string[]; addedItems: Array<{ id: number; file: File }> };
+  setExpenseProcessingState: (
+    id: number,
+    status: Expense["receiptProcessingStatus"],
+    message?: string
+  ) => void;
+  applyExpenseExtractionResult: (
+    id: number,
+    data: {
+      description?: string | null;
+      expenseLine?: string | null;
+      accountCode?: string | null;
+      amountBRL?: number | null;
+      amountUSD?: number | null;
+      supplierCnpj?: string | null;
+    }
+  ) => void;
 }
 
 export function ExpensesSection({
@@ -37,6 +71,9 @@ export function ExpensesSection({
   onUpdate,
   onExpenseLineChange,
   onAttachmentChange,
+  addExpensesFromFiles,
+  setExpenseProcessingState,
+  applyExpenseExtractionResult,
 }: Props) {
   const [openItems, setOpenItems] = useState<Record<number, boolean>>({});
   const [pdfExtractingId, setPdfExtractingId] = useState<number | null>(null);
@@ -52,8 +89,72 @@ export function ExpensesSection({
     return Number.isFinite(n) ? n : 0;
   };
 
+  const processReceiptExtraction = async (id: number, file: File) => {
+    setExpenseProcessingState(id, "processing");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(apiUrl("/api/receipts/extract"), {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        extraction?: {
+          description?: string | null;
+          expenseLine?: string | null;
+          accountCode?: string | null;
+          amountBRL?: number | null;
+          amountUSD?: number | null;
+          supplierCnpj?: string | null;
+        };
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Falha na extração automática");
+      }
+      applyExpenseExtractionResult(id, data.extraction ?? {});
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "Não foi possível extrair os dados. Você pode preencher manualmente.";
+      setExpenseProcessingState(id, "error", msg);
+      toast.error(msg);
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-refined space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Upload className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-medium text-foreground">Comprovantes</h3>
+            <p className="text-sm text-muted-foreground mt-0.5 font-light">
+              Envie primeiro os arquivos: cada um gera uma despesa. Você ainda pode adicionar linhas
+              manualmente ou trocar o anexo em cada item.
+            </p>
+          </div>
+        </div>
+        <ReceiptBulkUpload
+          disabled={pdfExtractingId !== null}
+          onFiles={(files) => {
+            const result = addExpensesFromFiles(files);
+            toastBulkUploadSummary(result.added, result.errors);
+            result.addedItems.forEach((item) => {
+              void processReceiptExtraction(item.id, item.file);
+            });
+          }}
+        />
+      </div>
+
+      {errors.expenses_empty && (
+        <p className="text-sm text-destructive px-1">{errors.expenses_empty}</p>
+      )}
+
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-refined">
         {/* Header — uma única solicitação */}
         <div className="px-5 md:px-6 py-4 md:py-5 border-b border-border bg-muted/30">
@@ -88,6 +189,14 @@ export function ExpensesSection({
 
         {/* Body — todas as despesas do mesmo reembolso */}
         <div className="divide-y divide-border">
+          {expenses.length === 0 && (
+            <div className="px-5 md:px-6 py-14 text-center">
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                Nenhuma despesa ainda. Envie comprovantes na área acima ou use «Adicionar despesa» para
+                incluir uma linha manualmente.
+              </p>
+            </div>
+          )}
           {expenses.map((expense, index) => {
             const expanded = isOpen(expense.id);
             return (
@@ -106,29 +215,55 @@ export function ExpensesSection({
                     )}
                     <span className="text-sm font-medium text-foreground truncate">
                       Item {index + 1}
-                      {expense.description?.trim() ? ` · ${expense.description.trim()}` : ""}
+                      {expense.attachment
+                        ? ` · ${expense.attachment.name}`
+                        : expense.description?.trim()
+                          ? ` · ${expense.description.trim()}`
+                          : ""}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
+                    {expense.receiptProcessingStatus === "processing" && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 font-normal rounded-lg border-0 bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                      >
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Processando…
+                      </Badge>
+                    )}
+                    {expense.receiptProcessingStatus === "extracted" && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 font-normal rounded-lg border-emerald-500/40 text-emerald-800 dark:text-emerald-200 bg-emerald-500/10"
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Extraído
+                      </Badge>
+                    )}
+                    {expense.receiptProcessingStatus === "error" && (
+                      <Badge variant="destructive" className="gap-1 font-normal rounded-lg">
+                        <AlertCircle className="h-3 w-3" />
+                        Erro
+                      </Badge>
+                    )}
                     <span className="text-sm tabular-nums text-foreground">
                       R${" "}
                       {lineTotal(expense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
-                    {expenses.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                        title="Remover item"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemove(expense.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      title="Remover item"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(expense.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </button>
 
@@ -140,6 +275,26 @@ export function ExpensesSection({
                 >
                   <div className="overflow-hidden">
                     <div className="px-5 md:px-6 pb-5 pt-0 space-y-4">
+                      {errors[`expense_${expense.id}_processing`] && (
+                        <p className="text-xs text-destructive">
+                          {errors[`expense_${expense.id}_processing`]}
+                        </p>
+                      )}
+                      {expense.receiptProcessingMessage && (
+                        <p className="text-xs text-destructive">{expense.receiptProcessingMessage}</p>
+                      )}
+                      {expense.receiptProcessingStatus && (
+                        <div className="rounded-xl border border-dashed border-primary/25 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+                          <p className="font-medium text-foreground/90 text-xs uppercase tracking-wide mb-1">
+                            Preenchimento automático
+                          </p>
+                          <p className="font-light leading-relaxed">
+                            Descrição, valor, fornecedor e demais campos serão obtidos do comprovante na
+                            próxima etapa do sistema. Por enquanto, revise o arquivo e complete os dados
+                            obrigatórios abaixo se necessário.
+                          </p>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <DescriptionCombobox
                           inputId={`expense-desc-${expense.id}`}
@@ -215,13 +370,34 @@ export function ExpensesSection({
                           )}
                         </div>
 
+                        <div className="space-y-2">
+                          <Label className="text-sm text-muted-foreground">Valor em $ (opcional)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={expense.amountUsd ?? ""}
+                            onChange={(e) => onUpdate(expense.id, "amountUsd", e.target.value)}
+                            placeholder="0.00"
+                            className="h-12 rounded-xl bg-secondary border-border font-light"
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
+                          <Label className="text-sm text-muted-foreground">CNPJ do fornecedor</Label>
+                          <Input
+                            value={expense.supplierCnpj ?? ""}
+                            onChange={(e) => onUpdate(expense.id, "supplierCnpj", e.target.value)}
+                            placeholder="00.000.000/0000-00"
+                            className="h-12 rounded-xl bg-secondary border-border font-light"
+                          />
+                        </div>
+
                         <div className="space-y-2 md:col-span-2">
                           <Label className="text-sm text-muted-foreground">Comprovante desta despesa *</Label>
                           <p className="text-xs text-muted-foreground">
-                            <strong className="font-medium text-foreground">PDF:</strong> o valor é
-                            preenchido automaticamente quando possível.{" "}
-                            <strong className="font-medium text-foreground">Foto de nota fiscal:</strong>{" "}
-                            informe o valor manualmente.
+                            O sistema tenta preencher descrição, classificação, CNPJ e valores automaticamente
+                            após anexar o arquivo. Se falhar, você pode editar tudo manualmente.
                           </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <label
@@ -234,7 +410,7 @@ export function ExpensesSection({
                             <input
                               id={`attachment-${expense.id}`}
                               type="file"
-                              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                              accept={RECEIPT_ACCEPT_ATTR}
                               className="sr-only"
                               disabled={pdfExtractingId === expense.id}
                               onChange={(e) => {
@@ -246,49 +422,9 @@ export function ExpensesSection({
                                     return;
                                   }
                                   onAttachmentChange(expense.id, f);
-                                  if (f.type !== "application/pdf") {
-                                    return;
-                                  }
                                   setPdfExtractingId(expense.id);
-                                  try {
-                                    const fd = new FormData();
-                                    fd.append("file", f);
-                                    fd.append("docKind", "pdf_licenca");
-                                    const res = await fetch(apiUrl("/api/lab/extract"), {
-                                      method: "POST",
-                                      credentials: "include",
-                                      body: fd,
-                                    });
-                                    const data = (await res.json().catch(() => ({}))) as {
-                                      hints?: LabExtractHints;
-                                      error?: string;
-                                      text?: string;
-                                    };
-                                    if (!res.ok) {
-                                      throw new Error(data.error ?? "Falha ao analisar PDF");
-                                    }
-                                    if (!data.text?.trim()) {
-                                      toast.message(
-                                        "Este PDF não tem texto selecionável (costuma ser página só em imagem). Preencha o valor manualmente."
-                                      );
-                                      return;
-                                    }
-                                    const amt = parseAmountFromPdfHints(data.hints ?? {});
-                                    if (amt) {
-                                      onUpdate(expense.id, "amount", amt);
-                                      toast.success("Valor preenchido a partir do PDF");
-                                    } else {
-                                      toast.message(
-                                        "Não encontramos um valor confiável no texto do PDF (ex.: fatura em $ ou layout diferente). Preencha manualmente."
-                                      );
-                                    }
-                                  } catch {
-                                    toast.error(
-                                      "Não foi possível analisar o PDF. Preencha o valor manualmente."
-                                    );
-                                  } finally {
-                                    setPdfExtractingId(null);
-                                  }
+                                  await processReceiptExtraction(expense.id, f);
+                                  setPdfExtractingId(null);
                                 })();
                               }}
                             />
