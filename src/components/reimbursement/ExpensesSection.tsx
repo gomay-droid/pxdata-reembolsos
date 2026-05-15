@@ -40,7 +40,7 @@ interface Props {
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onAttachmentChange: (id: number, file: File | null) => void;
-  /** Um arquivo = uma despesa; valida??o e estado de processamento no hook. */
+  /** Um arquivo = uma despesa; validação e estado de processamento no hook. */
   addExpensesFromFiles: (
     files: File[]
   ) => { added: number; errors: string[]; addedItems: Array<{ id: number; file: File }> };
@@ -111,14 +111,14 @@ export function ExpensesSection({
         };
       };
       if (!res.ok) {
-        throw new Error(data.error ?? "Falha na extra??o autom?tica");
+        throw new Error(data.error ?? "Falha na extração automática");
       }
       applyExpenseExtractionResult(id, data.extraction ?? {});
     } catch (e) {
       const msg =
         e instanceof Error
           ? e.message
-          : "N?o foi poss?vel extrair os dados. Voc? pode preencher manualmente.";
+          : "Não foi possível extrair os dados. Você pode preencher manualmente.";
       setExpenseProcessingState(id, "error", msg);
       toast.error(msg);
     }
@@ -134,7 +134,7 @@ export function ExpensesSection({
           <div className="min-w-0">
             <h3 className="text-base font-medium text-foreground">Comprovantes</h3>
             <p className="text-sm text-muted-foreground mt-0.5 font-light">
-              Envie primeiro os arquivos: cada um gera uma despesa. Voc? ainda pode adicionar linhas
+              Envie primeiro os arquivos: cada um gera uma despesa. Você ainda pode adicionar linhas
               manualmente ou trocar o anexo em cada item.
             </p>
           </div>
@@ -156,7 +156,7 @@ export function ExpensesSection({
       )}
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-refined">
-        {/* Header ? uma ?nica solicita??o */}
+        {/* Header — uma única solicitação */}
         <div className="px-5 md:px-6 py-4 md:py-5 border-b border-border bg-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
@@ -164,11 +164,11 @@ export function ExpensesSection({
                 <Receipt className="h-5 w-5 text-accent-foreground" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base font-medium text-foreground">Despesas desta solicita??o</h3>
+                <h3 className="text-base font-medium text-foreground">Despesas desta solicitação</h3>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Uma solicita??o ? {expenses.length}{" "}
-                  {expenses.length === 1 ? "despesa" : "despesas"} ? cada item tem seu comprovante ? o
-                  total aparece no rodap?
+                  Uma solicitação · {expenses.length}{" "}
+                  {expenses.length === 1 ? "despesa" : "despesas"} · cada item tem seu comprovante · o
+                  total aparece no rodapé
                 </p>
               </div>
             </div>
@@ -187,12 +187,12 @@ export function ExpensesSection({
           </div>
         </div>
 
-        {/* Body ? todas as despesas do mesmo reembolso */}
+        {/* Body — todas as despesas do mesmo reembolso */}
         <div className="divide-y divide-border">
           {expenses.length === 0 && (
             <div className="px-5 md:px-6 py-14 text-center">
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                Nenhuma despesa ainda. Envie comprovantes na ?rea acima ou use ?Adicionar despesa? para
+                Nenhuma despesa ainda. Envie comprovantes na área acima ou use «Adicionar despesa» para
                 incluir uma linha manualmente.
               </p>
             </div>
@@ -216,9 +216,9 @@ export function ExpensesSection({
                     <span className="text-sm font-medium text-foreground truncate">
                       Item {index + 1}
                       {expense.attachment
-                        ? ` ? ${expense.attachment.name}`
+                        ? ` · ${expense.attachment.name}`
                         : expense.description?.trim()
-                          ? ` ? ${expense.description.trim()}`
+                          ? ` · ${expense.description.trim()}`
                           : ""}
                     </span>
                   </div>
@@ -229,7 +229,7 @@ export function ExpensesSection({
                         className="gap-1 font-normal rounded-lg border-0 bg-amber-500/15 text-amber-900 dark:text-amber-100"
                       >
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        Processando?
+                        Processando…
                       </Badge>
                     )}
                     {expense.receiptProcessingStatus === "extracted" && (
@@ -238,7 +238,7 @@ export function ExpensesSection({
                         className="gap-1 font-normal rounded-lg border-emerald-500/40 text-emerald-800 dark:text-emerald-200 bg-emerald-500/10"
                       >
                         <CheckCircle2 className="h-3 w-3" />
-                        Extra?do
+                        Extraído
                       </Badge>
                     )}
                     {expense.receiptProcessingStatus === "error" && (
@@ -286,10 +286,10 @@ export function ExpensesSection({
                       {expense.receiptProcessingStatus === "processing" && (
                         <div className="rounded-2xl border border-dashed border-primary/25 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
                           <p className="font-medium text-foreground/90 text-xs uppercase tracking-wide mb-1">
-                            Preenchimento autom?tico
+                            Preenchimento automático
                           </p>
                           <p className="font-light leading-relaxed">
-                            Lendo o comprovante e extraindo descri??o, valor, fornecedor e CNPJ. Aguarde
+                            Lendo o comprovante e extraindo descrição, valor, fornecedor e CNPJ. Aguarde
                             alguns segundos.
                           </p>
                         </div>
@@ -327,7 +327,7 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm text-muted-foreground">Conta cont?bil</Label>
+                          <Label className="text-sm text-muted-foreground">Conta contábil</Label>
                           <Select
                             value={expense.accountCode || undefined}
                             onValueChange={(v) => onUpdate(expense.id, "accountCode", v)}
@@ -370,7 +370,7 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm text-muted-foreground">IOF (opcional)</Label>
+                          <Label className="text-sm text-muted-foreground">IOF (opcional, imposto)</Label>
                           <Input
                             type="number"
                             step="0.01"
@@ -395,8 +395,8 @@ export function ExpensesSection({
                         <div className="space-y-2 md:col-span-2">
                           <Label className="text-sm text-muted-foreground">Comprovante desta despesa *</Label>
                           <p className="text-xs text-muted-foreground">
-                            O sistema tenta preencher descri??o, classifica??o, CNPJ e valores automaticamente
-                            ap?s anexar o arquivo. Se falhar, voc? pode editar tudo manualmente.
+                            O sistema tenta preencher descrição, classificação, CNPJ e valores automaticamente
+                            após anexar o arquivo. Se falhar, você pode editar tudo manualmente.
                           </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <label
@@ -463,7 +463,7 @@ export function ExpensesSection({
           })}
         </div>
 
-        {/* Footer ? total consolidado (destaque) */}
+        {/* Footer — total consolidado (destaque) */}
         <div className="px-5 md:px-6 py-4 border-t border-border bg-primary/5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
