@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,10 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Expense, EXPENSE_LINES, ACCOUNT_CODES, RECEIPT_ACCEPT_ATTR } from "@/types/reimbursement";
 import { DescriptionCombobox } from "@/components/reimbursement/DescriptionCombobox";
 import {
+  AlertCircle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
   Image,
+  Loader2,
   Plus,
   Receipt,
   Trash2,
@@ -23,7 +27,9 @@ import {
   X,
 } from "lucide-react";
 import { ReceiptBulkUpload, toastBulkUploadSummary } from "@/components/reimbursement/ReceiptBulkUpload";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { apiUrl } from "@/lib/apiBase";
 
 interface Props {
   expenses: Expense[];
@@ -34,8 +40,26 @@ interface Props {
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onAttachmentChange: (id: number, file: File | null) => void;
-  /** Um arquivo = uma despesa. */
-  addExpensesFromFiles: (files: File[]) => { added: number; errors: string[] };
+  /** Um arquivo = uma despesa; valida??o e estado de processamento no hook. */
+  addExpensesFromFiles: (
+    files: File[]
+  ) => { added: number; errors: string[]; addedItems: Array<{ id: number; file: File }> };
+  setExpenseProcessingState: (
+    id: number,
+    status: Expense["receiptProcessingStatus"],
+    message?: string
+  ) => void;
+  applyExpenseExtractionResult: (
+    id: number,
+    data: {
+      description?: string | null;
+      expenseLine?: string | null;
+      accountCode?: string | null;
+      amountBRL?: number | null;
+      amountUSD?: number | null;
+      supplierCnpj?: string | null;
+    }
+  ) => void;
 }
 
 export function ExpensesSection({
@@ -48,8 +72,11 @@ export function ExpensesSection({
   onExpenseLineChange,
   onAttachmentChange,
   addExpensesFromFiles,
+  setExpenseProcessingState,
+  applyExpenseExtractionResult,
 }: Props) {
   const [openItems, setOpenItems] = useState<Record<number, boolean>>({});
+  const [pdfExtractingId, setPdfExtractingId] = useState<number | null>(null);
 
   const isOpen = (id: number) => openItems[id] !== false;
 
@@ -62,6 +89,41 @@ export function ExpensesSection({
     return Number.isFinite(n) ? n : 0;
   };
 
+  const processReceiptExtraction = async (id: number, file: File) => {
+    setExpenseProcessingState(id, "processing");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(apiUrl("/api/receipts/extract"), {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        extraction?: {
+          description?: string | null;
+          expenseLine?: string | null;
+          accountCode?: string | null;
+          amountBRL?: number | null;
+          amountUSD?: number | null;
+          supplierCnpj?: string | null;
+        };
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Falha na extra??o autom?tica");
+      }
+      applyExpenseExtractionResult(id, data.extraction ?? {});
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : "N?o foi poss?vel extrair os dados. Voc? pode preencher manualmente.";
+      setExpenseProcessingState(id, "error", msg);
+      toast.error(msg);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-border bg-card p-5 md:p-6 shadow-refined space-y-3">
@@ -72,15 +134,19 @@ export function ExpensesSection({
           <div className="min-w-0">
             <h3 className="text-base font-medium text-foreground">Comprovantes</h3>
             <p className="text-sm text-muted-foreground mt-0.5 font-light">
-              Envie primeiro os arquivos: cada um gera uma despesa. Você ainda pode adicionar linhas
+              Envie primeiro os arquivos: cada um gera uma despesa. Voc? ainda pode adicionar linhas
               manualmente ou trocar o anexo em cada item.
             </p>
           </div>
         </div>
         <ReceiptBulkUpload
+          disabled={pdfExtractingId !== null}
           onFiles={(files) => {
             const result = addExpensesFromFiles(files);
             toastBulkUploadSummary(result.added, result.errors);
+            result.addedItems.forEach((item) => {
+              void processReceiptExtraction(item.id, item.file);
+            });
           }}
         />
       </div>
@@ -90,6 +156,7 @@ export function ExpensesSection({
       )}
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-refined">
+        {/* Header ? uma ?nica solicita??o */}
         <div className="px-5 md:px-6 py-4 md:py-5 border-b border-border bg-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
@@ -97,11 +164,11 @@ export function ExpensesSection({
                 <Receipt className="h-5 w-5 text-accent-foreground" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base font-medium text-foreground">Despesas desta solicitação</h3>
+                <h3 className="text-base font-medium text-foreground">Despesas desta solicita??o</h3>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Uma solicitação · {expenses.length}{" "}
-                  {expenses.length === 1 ? "despesa" : "despesas"} · cada item tem seu comprovante · o
-                  total aparece no rodapé
+                  Uma solicita??o ? {expenses.length}{" "}
+                  {expenses.length === 1 ? "despesa" : "despesas"} ? cada item tem seu comprovante ? o
+                  total aparece no rodap?
                 </p>
               </div>
             </div>
@@ -120,11 +187,12 @@ export function ExpensesSection({
           </div>
         </div>
 
+        {/* Body ? todas as despesas do mesmo reembolso */}
         <div className="divide-y divide-border">
           {expenses.length === 0 && (
             <div className="px-5 md:px-6 py-14 text-center">
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                Nenhuma despesa ainda. Envie comprovantes na área acima ou use «Adicionar despesa» para
+                Nenhuma despesa ainda. Envie comprovantes na ?rea acima ou use ?Adicionar despesa? para
                 incluir uma linha manualmente.
               </p>
             </div>
@@ -148,13 +216,37 @@ export function ExpensesSection({
                     <span className="text-sm font-medium text-foreground truncate">
                       Item {index + 1}
                       {expense.attachment
-                        ? ` · ${expense.attachment.name}`
+                        ? ` ? ${expense.attachment.name}`
                         : expense.description?.trim()
-                          ? ` · ${expense.description.trim()}`
+                          ? ` ? ${expense.description.trim()}`
                           : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
+                    {expense.receiptProcessingStatus === "processing" && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 font-normal rounded-lg border-0 bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                      >
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Processando?
+                      </Badge>
+                    )}
+                    {expense.receiptProcessingStatus === "extracted" && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 font-normal rounded-lg border-emerald-500/40 text-emerald-800 dark:text-emerald-200 bg-emerald-500/10"
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Extra?do
+                      </Badge>
+                    )}
+                    {expense.receiptProcessingStatus === "error" && (
+                      <Badge variant="destructive" className="gap-1 font-normal rounded-lg">
+                        <AlertCircle className="h-3 w-3" />
+                        Erro
+                      </Badge>
+                    )}
                     <span className="text-sm tabular-nums text-foreground">
                       R${" "}
                       {lineTotal(expense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -183,6 +275,25 @@ export function ExpensesSection({
                 >
                   <div className="overflow-hidden">
                     <div className="px-5 md:px-6 pb-5 pt-0 space-y-4">
+                      {errors[`expense_${expense.id}_processing`] && (
+                        <p className="text-xs text-destructive">
+                          {errors[`expense_${expense.id}_processing`]}
+                        </p>
+                      )}
+                      {expense.receiptProcessingMessage && (
+                        <p className="text-xs text-destructive">{expense.receiptProcessingMessage}</p>
+                      )}
+                      {expense.receiptProcessingStatus === "processing" && (
+                        <div className="rounded-2xl border border-dashed border-primary/25 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+                          <p className="font-medium text-foreground/90 text-xs uppercase tracking-wide mb-1">
+                            Preenchimento autom?tico
+                          </p>
+                          <p className="font-light leading-relaxed">
+                            Lendo o comprovante e extraindo descri??o, valor, fornecedor e CNPJ. Aguarde
+                            alguns segundos.
+                          </p>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <DescriptionCombobox
                           inputId={`expense-desc-${expense.id}`}
@@ -216,7 +327,7 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm text-muted-foreground">Conta contábil</Label>
+                          <Label className="text-sm text-muted-foreground">Conta cont?bil</Label>
                           <Select
                             value={expense.accountCode || undefined}
                             onValueChange={(v) => onUpdate(expense.id, "accountCode", v)}
@@ -236,15 +347,21 @@ export function ExpensesSection({
 
                         <div className="space-y-2">
                           <Label className="text-sm text-muted-foreground">Valor (R$) *</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={expense.amount}
-                            onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
-                            placeholder="0,00"
-                            className="bg-secondary border-border font-light"
-                          />
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={expense.amount}
+                              onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
+                              placeholder="0,00"
+                              disabled={pdfExtractingId === expense.id}
+                              className="bg-secondary border-border font-light pr-10"
+                            />
+                            {pdfExtractingId === expense.id && (
+                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
                           {errors[`expense_${expense.id}_amount`] && (
                             <p className="text-xs text-destructive">
                               {errors[`expense_${expense.id}_amount`]}
@@ -253,7 +370,7 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm text-muted-foreground">Valor em $ (opcional)</Label>
+                          <Label className="text-sm text-muted-foreground">IOF (opcional)</Label>
                           <Input
                             type="number"
                             step="0.01"
@@ -278,8 +395,8 @@ export function ExpensesSection({
                         <div className="space-y-2 md:col-span-2">
                           <Label className="text-sm text-muted-foreground">Comprovante desta despesa *</Label>
                           <p className="text-xs text-muted-foreground">
-                            Anexe PDF, JPG ou PNG (até 15 MB). Preencha descrição, linha de despesa, valor e
-                            CNPJ manualmente.
+                            O sistema tenta preencher descri??o, classifica??o, CNPJ e valores automaticamente
+                            ap?s anexar o arquivo. Se falhar, voc? pode editar tudo manualmente.
                           </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <label
@@ -294,10 +411,20 @@ export function ExpensesSection({
                               type="file"
                               accept={RECEIPT_ACCEPT_ATTR}
                               className="sr-only"
+                              disabled={pdfExtractingId === expense.id}
                               onChange={(e) => {
                                 const f = e.target.files?.[0] ?? null;
                                 e.target.value = "";
-                                onAttachmentChange(expense.id, f);
+                                void (async () => {
+                                  if (!f) {
+                                    onAttachmentChange(expense.id, null);
+                                    return;
+                                  }
+                                  onAttachmentChange(expense.id, f);
+                                  setPdfExtractingId(expense.id);
+                                  await processReceiptExtraction(expense.id, f);
+                                  setPdfExtractingId(null);
+                                })();
                               }}
                             />
                             {expense.attachment && (
@@ -336,6 +463,7 @@ export function ExpensesSection({
           })}
         </div>
 
+        {/* Footer ? total consolidado (destaque) */}
         <div className="px-5 md:px-6 py-4 border-t border-border bg-primary/5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>

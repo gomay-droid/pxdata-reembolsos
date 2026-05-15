@@ -1,4 +1,6 @@
-/** Fluxo de upload: comprovante por linha (sem extração automática no servidor). */
+/** Fluxo de upload inteligente: estado por comprovante (ausente = linha adicionada manualmente). */
+export type ExpenseReceiptProcessingStatus = "processing" | "extracted" | "error";
+
 export interface Expense {
   id: number;
   description: string;
@@ -7,12 +9,16 @@ export interface Expense {
   amount: string;
   /** Valor original em dólar (quando identificado). Mantém espaço para futura conversão cambial. */
   amountUsd?: string;
-  /** CNPJ do fornecedor (editável). */
+  /** CNPJ do fornecedor extraído automaticamente (editável). */
   supplierCnpj?: string;
   /** Permite confirmar ausência de CNPJ quando não consta na nota. */
   supplierCnpjConfirmed?: boolean;
   /** Comprovante exclusivo desta linha (enviado no FormData na mesma ordem das despesas). */
   attachment: File | null;
+  /** Presente quando o item veio do upload em massa ou anexo único com pipeline de extração. */
+  receiptProcessingStatus?: ExpenseReceiptProcessingStatus;
+  /** Mensagem amigável quando status é erro. */
+  receiptProcessingMessage?: string;
 }
 
 /** Limite alinhado ao multer do servidor (15 MB). */

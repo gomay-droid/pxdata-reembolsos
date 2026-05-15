@@ -135,7 +135,7 @@ export function ReimbursementReviewSection({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Valor em $</Label>
+                <Label className="text-sm text-muted-foreground">IOF</Label>
                 <Input
                   type="number"
                   step="0.01"

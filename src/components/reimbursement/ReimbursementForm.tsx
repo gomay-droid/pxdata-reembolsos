@@ -39,6 +39,8 @@ export default function ReimbursementForm({
     addExpense,
     removeExpense,
     addExpensesFromFiles,
+    setExpenseProcessingState,
+    applyExpenseExtractionResult,
     updateExpense,
     updateExpenseLine,
     updateExpenseAttachment,
@@ -179,6 +181,8 @@ export default function ReimbursementForm({
           onAdd={addExpense}
           onRemove={removeExpense}
           addExpensesFromFiles={addExpensesFromFiles}
+          setExpenseProcessingState={setExpenseProcessingState}
+          applyExpenseExtractionResult={applyExpenseExtractionResult}
           onUpdate={updateExpense}
           onExpenseLineChange={updateExpenseLine}
           onAttachmentChange={updateExpenseAttachment}
