@@ -45,7 +45,7 @@ export function ReimbursementReviewSection({
 
       <div className={expensesContainerClassName ?? "space-y-4"}>
         {expenses.map((expense, idx) => (
-          <div key={expense.id} className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+          <div key={expense.id} className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
             <p className="text-sm font-medium text-foreground">Despesa {idx + 1}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -53,7 +53,7 @@ export function ReimbursementReviewSection({
                 <Input
                   value={expense.description}
                   onChange={(e) => onUpdate(expense.id, "description", e.target.value)}
-                  className="h-11 rounded-xl bg-card border-border font-light"
+                  className="h-11 bg-card border-border font-light"
                 />
                 {errors[`expense_${expense.id}_description`] && (
                   <p className="text-xs text-destructive">{errors[`expense_${expense.id}_description`]}</p>
@@ -66,7 +66,7 @@ export function ReimbursementReviewSection({
                   value={expense.expenseLine || undefined}
                   onValueChange={(v) => onExpenseLineChange(expense.id, v)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-card border-border font-light">
+                  <SelectTrigger className="h-11 bg-card border-border font-light">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -85,7 +85,7 @@ export function ReimbursementReviewSection({
                   value={expense.accountCode || undefined}
                   onValueChange={(v) => onUpdate(expense.id, "accountCode", v)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-card border-border font-light">
+                  <SelectTrigger className="h-11 bg-card border-border font-light">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -104,7 +104,7 @@ export function ReimbursementReviewSection({
                   value={expense.supplierCnpj ?? ""}
                   onChange={(e) => onUpdate(expense.id, "supplierCnpj", e.target.value)}
                   placeholder="00.000.000/0000-00"
-                  className="h-11 rounded-xl bg-card border-border font-light"
+                  className="h-11 bg-card border-border font-light"
                 />
                 <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                   <input
@@ -127,7 +127,7 @@ export function ReimbursementReviewSection({
                   min="0"
                   value={expense.amount}
                   onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
-                  className="h-11 rounded-xl bg-card border-border font-light"
+                  className="h-11 bg-card border-border font-light"
                 />
                 {errors[`expense_${expense.id}_amount`] && (
                   <p className="text-xs text-destructive">{errors[`expense_${expense.id}_amount`]}</p>
@@ -142,7 +142,7 @@ export function ReimbursementReviewSection({
                   min="0"
                   value={expense.amountUsd ?? ""}
                   onChange={(e) => onUpdate(expense.id, "amountUsd", e.target.value)}
-                  className="h-11 rounded-xl bg-card border-border font-light"
+                  className="h-11 bg-card border-border font-light"
                 />
               </div>
             </div>
@@ -150,7 +150,7 @@ export function ReimbursementReviewSection({
         ))}
       </div>
 
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between gap-3">
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-foreground">
           <DollarSign className="h-4 w-4 text-primary" />
           Total do reembolso (R$)
@@ -160,7 +160,7 @@ export function ReimbursementReviewSection({
         </p>
       </div>
 
-      <div className="rounded-xl border border-border bg-background/60 p-4 space-y-2">
+      <div className="rounded-2xl border border-border bg-background/60 p-4 space-y-2">
         <label className="inline-flex items-center gap-2 text-sm text-foreground">
           <input
             type="checkbox"

@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, List, Loader2, LogOut, Plus, Settings } from "lucide-react";
 import type { Reimbursement } from "@/types/reimbursement";
 import type { CompanyProfile } from "@/types/company";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogoMark } from "@/components/BrandLogoMark";
 import { apiUrl } from "@/lib/apiBase";
@@ -144,7 +144,7 @@ const Index = () => {
               variant={view === "list" ? "default" : "ghost"}
               size="sm"
               onClick={() => setView("list")}
-              className="rounded-xl gap-2"
+              className="gap-2"
             >
               <List className="h-4 w-4" />
               <span className="hidden sm:inline">Histórico</span>
@@ -159,7 +159,7 @@ const Index = () => {
                 }
                 toast.error("Você não tem autorização para acessar a página de Administração.");
               }}
-              className="rounded-xl h-9 w-9 p-0"
+              className="h-9 w-9 p-0"
               title="Administração"
               aria-label="Administração"
             >
@@ -169,18 +169,12 @@ const Index = () => {
               variant="ghost"
               size="sm"
               onClick={() => void logout()}
-              className="rounded-xl gap-2 text-muted-foreground"
+              className="gap-2 text-muted-foreground"
               title="Sair"
             >
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">Sair</span>
             </Button>
-            <Link
-              to="/lab/extracao"
-              className="hidden lg:inline text-xs text-muted-foreground hover:text-foreground whitespace-nowrap"
-            >
-              Lab extração
-            </Link>
           </div>
         </div>
       </header>
@@ -206,7 +200,7 @@ const Index = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setView("form")}
-                    className="rounded-xl gap-2 shrink-0 -ml-2 text-muted-foreground hover:text-foreground"
+                    className="gap-2 shrink-0 -ml-2 text-muted-foreground hover:text-foreground"
                     aria-label="Voltar para a solicitação"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -225,7 +219,7 @@ const Index = () => {
                   type="button"
                   size="sm"
                   onClick={() => setView("form")}
-                  className="rounded-xl gap-2 w-full sm:w-auto shrink-0"
+                  className="gap-2 w-full sm:w-auto shrink-0"
                 >
                   <Plus className="h-4 w-4" />
                   Nova solicitação

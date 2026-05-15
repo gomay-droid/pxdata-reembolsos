@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 import { OAuth2Client } from "google-auth-library";
 /// <reference path="./session.d.ts" />
 import { PrismaClient } from "@prisma/client";
-import { buildHintsByDocKind, buildReceiptExtraction, extractTextFromBuffer } from "./extractLab";
 import {
   adminReimbursementDetailInclude,
   buildAdminExpenseRowsForJson,
@@ -319,18 +318,6 @@ const upload = multer({
   },
 });
 
-const labUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const ok =
-      file.mimetype === "application/pdf" ||
-      file.mimetype === "image/jpeg" ||
-      file.mimetype === "image/png";
-    cb(null, ok);
-  },
-});
-
 type PayloadExpense = {
   description: string;
   expenseLine: string;
@@ -608,54 +595,6 @@ app.patch("/api/admin/reimbursements/:id/status", requireAuth, requireAdmin, asy
     res.json({ id: formatReimbursementId(updated.id), status: updated.status });
   } catch {
     res.status(404).json({ error: "Reembolso não encontrado" });
-  }
-});
-
-/** Laboratório: extrai texto de PDF (camada de texto) ou imagem (OCR). Requer login. */
-app.post("/api/lab/extract", requireAuth, labUpload.single("file"), async (req, res) => {
-  const file = req.file;
-  if (!file) {
-    return res.status(400).json({ error: "Envie um arquivo PDF ou imagem (JPEG/PNG)" });
-  }
-  const docKind = typeof req.body?.docKind === "string" ? req.body.docKind : "desconhecido";
-  try {
-    const { text, method } = await extractTextFromBuffer(file.buffer, file.mimetype);
-    const hints = buildHintsByDocKind(text, docKind, file.mimetype);
-    res.json({
-      text,
-      method,
-      hints,
-      docKind,
-      filename: file.originalname,
-      mimeType: file.mimetype,
-    });
-  } catch (e) {
-    console.error("[lab/extract]", e);
-    const msg = e instanceof Error ? e.message : "Falha ao extrair texto";
-    res.status(500).json({ error: msg });
-  }
-});
-
-/** Extração estruturada para despesas: descrição, classificação, conta, valores e CNPJ. */
-app.post("/api/receipts/extract", requireAuth, labUpload.single("file"), async (req, res) => {
-  const file = req.file;
-  if (!file) {
-    return res.status(400).json({ error: "Envie um arquivo PDF ou imagem (JPEG/PNG)" });
-  }
-  try {
-    const { text, method } = await extractTextFromBuffer(file.buffer, file.mimetype);
-    const extraction = buildReceiptExtraction(text, file.originalname);
-    res.json({
-      extraction,
-      method,
-      filename: file.originalname,
-      mimeType: file.mimetype,
-      canEditManually: true,
-    });
-  } catch (e) {
-    console.error("[receipts/extract]", e);
-    const msg = e instanceof Error ? e.message : "Falha ao extrair dados do comprovante";
-    res.status(500).json({ error: msg, canEditManually: true });
   }
 });
 

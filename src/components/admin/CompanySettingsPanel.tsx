@@ -97,7 +97,6 @@ export function CompanySettingsPanel() {
             id="co-name"
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
-            className="rounded-xl"
             autoComplete="organization"
           />
         </div>
@@ -107,7 +106,6 @@ export function CompanySettingsPanel() {
             id="co-address"
             value={form.address}
             onChange={(e) => update("address", e.target.value)}
-            className="rounded-xl"
             autoComplete="street-address"
           />
         </div>
@@ -117,7 +115,6 @@ export function CompanySettingsPanel() {
             id="co-cnpj"
             value={form.cnpj}
             onChange={(e) => update("cnpj", e.target.value)}
-            className="rounded-xl"
           />
         </div>
         <div className="space-y-2">
@@ -127,14 +124,13 @@ export function CompanySettingsPanel() {
             type="email"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
-            className="rounded-xl"
             autoComplete="email"
           />
         </div>
 
         <Button
           type="button"
-          className="rounded-xl gap-2"
+          className="gap-2"
           disabled={saving}
           onClick={() => void save()}
         >

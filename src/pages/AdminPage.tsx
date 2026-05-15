@@ -258,10 +258,10 @@ export default function AdminPage() {
             Apenas usuários do financeiro podem acessar esta área administrativa.
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button type="button" onClick={() => navigate("/")} className="rounded-xl gap-2">
+            <Button type="button" onClick={() => navigate("/")} className="gap-2">
               Voltar
             </Button>
-            <Button type="button" variant="ghost" onClick={() => void logout()} className="rounded-xl gap-2">
+            <Button type="button" variant="ghost" onClick={() => void logout()} className="gap-2">
               <X className="h-4 w-4" />
               Sair
             </Button>
@@ -281,7 +281,7 @@ export default function AdminPage() {
               variant="ghost"
               size="sm"
               onClick={() => navigate("/")}
-              className="rounded-xl gap-2"
+              className="gap-2"
             >
               Voltar
             </Button>
@@ -295,7 +295,7 @@ export default function AdminPage() {
               variant="ghost"
               size="sm"
               onClick={() => void logout()}
-              className="rounded-xl gap-2 text-muted-foreground"
+              className="gap-2 text-muted-foreground"
               title="Sair"
             >
               <X className="h-4 w-4" />
@@ -324,7 +324,6 @@ export default function AdminPage() {
                 variant={tab === "despesas" ? "default" : "outline"}
                 size="sm"
                 onClick={() => selectTab("despesas")}
-                className="rounded-xl"
               >
                 Despesas
               </Button>
@@ -333,7 +332,6 @@ export default function AdminPage() {
                 variant={tab === "dashboard" ? "default" : "outline"}
                 size="sm"
                 onClick={() => selectTab("dashboard")}
-                className="rounded-xl"
               >
                 Dashboard
               </Button>
@@ -342,7 +340,6 @@ export default function AdminPage() {
                 variant={tab === "empresa" ? "default" : "outline"}
                 size="sm"
                 onClick={() => selectTab("empresa")}
-                className="rounded-xl"
               >
                 Dados da Empresa
               </Button>
@@ -402,7 +399,7 @@ export default function AdminPage() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="rounded-xl h-9 w-9 p-0"
+                className="h-9 w-9 p-0"
                 onClick={() => closeDetails()}
                 aria-label="Fechar"
                 title="Fechar"
@@ -460,7 +457,7 @@ export default function AdminPage() {
                             R$ {e.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                           </div>
                         </div>
-                        <div className="rounded-xl border border-border/70 bg-muted/15 p-3 space-y-2">
+                        <div className="rounded-2xl border border-border/70 bg-muted/15 p-3 space-y-2">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             Comprovante desta despesa
                           </p>
@@ -473,7 +470,7 @@ export default function AdminPage() {
                                 >
                                   <span className="truncate text-foreground">{a.originalName}</span>
                                   <a href={assetUrl(a.url)} download target="_blank" rel="noreferrer" className="shrink-0">
-                                    <Button type="button" size="sm" variant="secondary" className="rounded-xl gap-1.5 h-8">
+                                    <Button type="button" size="sm" variant="secondary" className="gap-1.5 h-8">
                                       <Download className="h-3.5 w-3.5" />
                                       Baixar
                                     </Button>
@@ -495,7 +492,7 @@ export default function AdminPage() {
                             variant="outline"
                             size="sm"
                             disabled={patchingDecision !== null}
-                            className="rounded-xl gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+                            className="gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
                             onClick={() => void submitAdminDecision("approve")}
                           >
                             {patchingDecision === "approve" ? (
@@ -510,7 +507,7 @@ export default function AdminPage() {
                             variant="outline"
                             size="sm"
                             disabled={patchingDecision !== null}
-                            className="rounded-xl gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                            className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
                             onClick={() => void submitAdminDecision("reject")}
                           >
                             {patchingDecision === "reject" ? (
@@ -525,7 +522,7 @@ export default function AdminPage() {
                             variant="outline"
                             size="sm"
                             disabled={patchingDecision !== null}
-                            className="rounded-xl gap-1.5 border-amber-500/40 text-amber-800 hover:bg-amber-500/10 dark:text-amber-400"
+                            className="gap-1.5 border-amber-500/40 text-amber-800 hover:bg-amber-500/10 dark:text-amber-400"
                             onClick={() => void submitAdminDecision("contest")}
                           >
                             {patchingDecision === "contest" ? (
@@ -540,7 +537,7 @@ export default function AdminPage() {
                             variant="outline"
                             size="sm"
                             disabled={patchingDecision !== null}
-                            className="rounded-xl gap-1.5 border-border/80 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                            className="gap-1.5 border-border/80 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                             onClick={() =>
                               setExpenseEmailModal({
                                 kind: expenseEmailKindForReimbursementStatus(selected.status),

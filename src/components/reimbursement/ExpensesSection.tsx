@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,13 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Expense, EXPENSE_LINES, ACCOUNT_CODES, RECEIPT_ACCEPT_ATTR } from "@/types/reimbursement";
 import { DescriptionCombobox } from "@/components/reimbursement/DescriptionCombobox";
 import {
-  AlertCircle,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
   Image,
-  Loader2,
   Plus,
   Receipt,
   Trash2,
@@ -27,9 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { ReceiptBulkUpload, toastBulkUploadSummary } from "@/components/reimbursement/ReceiptBulkUpload";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { apiUrl } from "@/lib/apiBase";
 
 interface Props {
   expenses: Expense[];
@@ -40,26 +34,8 @@ interface Props {
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onAttachmentChange: (id: number, file: File | null) => void;
-  /** Um arquivo = uma despesa; validação e estado de processamento no hook. */
-  addExpensesFromFiles: (
-    files: File[]
-  ) => { added: number; errors: string[]; addedItems: Array<{ id: number; file: File }> };
-  setExpenseProcessingState: (
-    id: number,
-    status: Expense["receiptProcessingStatus"],
-    message?: string
-  ) => void;
-  applyExpenseExtractionResult: (
-    id: number,
-    data: {
-      description?: string | null;
-      expenseLine?: string | null;
-      accountCode?: string | null;
-      amountBRL?: number | null;
-      amountUSD?: number | null;
-      supplierCnpj?: string | null;
-    }
-  ) => void;
+  /** Um arquivo = uma despesa. */
+  addExpensesFromFiles: (files: File[]) => { added: number; errors: string[] };
 }
 
 export function ExpensesSection({
@@ -72,11 +48,8 @@ export function ExpensesSection({
   onExpenseLineChange,
   onAttachmentChange,
   addExpensesFromFiles,
-  setExpenseProcessingState,
-  applyExpenseExtractionResult,
 }: Props) {
   const [openItems, setOpenItems] = useState<Record<number, boolean>>({});
-  const [pdfExtractingId, setPdfExtractingId] = useState<number | null>(null);
 
   const isOpen = (id: number) => openItems[id] !== false;
 
@@ -87,41 +60,6 @@ export function ExpensesSection({
   const lineTotal = (e: Expense) => {
     const n = parseFloat(e.amount);
     return Number.isFinite(n) ? n : 0;
-  };
-
-  const processReceiptExtraction = async (id: number, file: File) => {
-    setExpenseProcessingState(id, "processing");
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(apiUrl("/api/receipts/extract"), {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        extraction?: {
-          description?: string | null;
-          expenseLine?: string | null;
-          accountCode?: string | null;
-          amountBRL?: number | null;
-          amountUSD?: number | null;
-          supplierCnpj?: string | null;
-        };
-      };
-      if (!res.ok) {
-        throw new Error(data.error ?? "Falha na extração automática");
-      }
-      applyExpenseExtractionResult(id, data.extraction ?? {});
-    } catch (e) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : "Não foi possível extrair os dados. Você pode preencher manualmente.";
-      setExpenseProcessingState(id, "error", msg);
-      toast.error(msg);
-    }
   };
 
   return (
@@ -140,13 +78,9 @@ export function ExpensesSection({
           </div>
         </div>
         <ReceiptBulkUpload
-          disabled={pdfExtractingId !== null}
           onFiles={(files) => {
             const result = addExpensesFromFiles(files);
             toastBulkUploadSummary(result.added, result.errors);
-            result.addedItems.forEach((item) => {
-              void processReceiptExtraction(item.id, item.file);
-            });
           }}
         />
       </div>
@@ -156,7 +90,6 @@ export function ExpensesSection({
       )}
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-refined">
-        {/* Header — uma única solicitação */}
         <div className="px-5 md:px-6 py-4 md:py-5 border-b border-border bg-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
@@ -178,7 +111,7 @@ export function ExpensesSection({
                 variant="outline"
                 size="sm"
                 onClick={onAdd}
-                className="rounded-xl gap-2 border-primary/20 text-accent-foreground hover:bg-accent h-10"
+                className="gap-2 border-border text-foreground hover:bg-accent h-10"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar despesa
@@ -187,7 +120,6 @@ export function ExpensesSection({
           </div>
         </div>
 
-        {/* Body — todas as despesas do mesmo reembolso */}
         <div className="divide-y divide-border">
           {expenses.length === 0 && (
             <div className="px-5 md:px-6 py-14 text-center">
@@ -223,30 +155,6 @@ export function ExpensesSection({
                     </span>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
-                    {expense.receiptProcessingStatus === "processing" && (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1 font-normal rounded-lg border-0 bg-amber-500/15 text-amber-900 dark:text-amber-100"
-                      >
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Processando…
-                      </Badge>
-                    )}
-                    {expense.receiptProcessingStatus === "extracted" && (
-                      <Badge
-                        variant="outline"
-                        className="gap-1 font-normal rounded-lg border-emerald-500/40 text-emerald-800 dark:text-emerald-200 bg-emerald-500/10"
-                      >
-                        <CheckCircle2 className="h-3 w-3" />
-                        Extraído
-                      </Badge>
-                    )}
-                    {expense.receiptProcessingStatus === "error" && (
-                      <Badge variant="destructive" className="gap-1 font-normal rounded-lg">
-                        <AlertCircle className="h-3 w-3" />
-                        Erro
-                      </Badge>
-                    )}
                     <span className="text-sm tabular-nums text-foreground">
                       R${" "}
                       {lineTotal(expense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -275,26 +183,6 @@ export function ExpensesSection({
                 >
                   <div className="overflow-hidden">
                     <div className="px-5 md:px-6 pb-5 pt-0 space-y-4">
-                      {errors[`expense_${expense.id}_processing`] && (
-                        <p className="text-xs text-destructive">
-                          {errors[`expense_${expense.id}_processing`]}
-                        </p>
-                      )}
-                      {expense.receiptProcessingMessage && (
-                        <p className="text-xs text-destructive">{expense.receiptProcessingMessage}</p>
-                      )}
-                      {expense.receiptProcessingStatus && (
-                        <div className="rounded-xl border border-dashed border-primary/25 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-                          <p className="font-medium text-foreground/90 text-xs uppercase tracking-wide mb-1">
-                            Preenchimento automático
-                          </p>
-                          <p className="font-light leading-relaxed">
-                            Descrição, valor, fornecedor e demais campos serão obtidos do comprovante na
-                            próxima etapa do sistema. Por enquanto, revise o arquivo e complete os dados
-                            obrigatórios abaixo se necessário.
-                          </p>
-                        </div>
-                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <DescriptionCombobox
                           inputId={`expense-desc-${expense.id}`}
@@ -309,7 +197,7 @@ export function ExpensesSection({
                             value={expense.expenseLine || undefined}
                             onValueChange={(v) => onExpenseLineChange(expense.id, v)}
                           >
-                            <SelectTrigger className="h-12 rounded-xl bg-secondary border-border font-light">
+                            <SelectTrigger className="bg-secondary border-border font-light">
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
@@ -333,7 +221,7 @@ export function ExpensesSection({
                             value={expense.accountCode || undefined}
                             onValueChange={(v) => onUpdate(expense.id, "accountCode", v)}
                           >
-                            <SelectTrigger className="h-12 rounded-xl bg-secondary border-border font-light">
+                            <SelectTrigger className="bg-secondary border-border font-light">
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
@@ -348,21 +236,15 @@ export function ExpensesSection({
 
                         <div className="space-y-2">
                           <Label className="text-sm text-muted-foreground">Valor (R$) *</Label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={expense.amount}
-                              onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
-                              placeholder="0,00"
-                              disabled={pdfExtractingId === expense.id}
-                              className="h-12 rounded-xl bg-secondary border-border font-light pr-10"
-                            />
-                            {pdfExtractingId === expense.id && (
-                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                            )}
-                          </div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={expense.amount}
+                            onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
+                            placeholder="0,00"
+                            className="bg-secondary border-border font-light"
+                          />
                           {errors[`expense_${expense.id}_amount`] && (
                             <p className="text-xs text-destructive">
                               {errors[`expense_${expense.id}_amount`]}
@@ -379,7 +261,7 @@ export function ExpensesSection({
                             value={expense.amountUsd ?? ""}
                             onChange={(e) => onUpdate(expense.id, "amountUsd", e.target.value)}
                             placeholder="0.00"
-                            className="h-12 rounded-xl bg-secondary border-border font-light"
+                            className="bg-secondary border-border font-light"
                           />
                         </div>
 
@@ -389,20 +271,20 @@ export function ExpensesSection({
                             value={expense.supplierCnpj ?? ""}
                             onChange={(e) => onUpdate(expense.id, "supplierCnpj", e.target.value)}
                             placeholder="00.000.000/0000-00"
-                            className="h-12 rounded-xl bg-secondary border-border font-light"
+                            className="bg-secondary border-border font-light"
                           />
                         </div>
 
                         <div className="space-y-2 md:col-span-2">
                           <Label className="text-sm text-muted-foreground">Comprovante desta despesa *</Label>
                           <p className="text-xs text-muted-foreground">
-                            O sistema tenta preencher descrição, classificação, CNPJ e valores automaticamente
-                            após anexar o arquivo. Se falhar, você pode editar tudo manualmente.
+                            Anexe PDF, JPG ou PNG (até 15 MB). Preencha descrição, linha de despesa, valor e
+                            CNPJ manualmente.
                           </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <label
                               htmlFor={`attachment-${expense.id}`}
-                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-secondary/50 px-4 py-3 text-sm text-foreground cursor-pointer hover:border-primary/30 transition-colors"
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-secondary/50 px-4 py-3 text-sm text-foreground cursor-pointer hover:border-foreground/25 transition-colors duration-300"
                             >
                               <Upload className="h-4 w-4 text-muted-foreground" />
                               {expense.attachment ? "Trocar arquivo" : "Escolher arquivo"}
@@ -412,24 +294,14 @@ export function ExpensesSection({
                               type="file"
                               accept={RECEIPT_ACCEPT_ATTR}
                               className="sr-only"
-                              disabled={pdfExtractingId === expense.id}
                               onChange={(e) => {
                                 const f = e.target.files?.[0] ?? null;
                                 e.target.value = "";
-                                void (async () => {
-                                  if (!f) {
-                                    onAttachmentChange(expense.id, null);
-                                    return;
-                                  }
-                                  onAttachmentChange(expense.id, f);
-                                  setPdfExtractingId(expense.id);
-                                  await processReceiptExtraction(expense.id, f);
-                                  setPdfExtractingId(null);
-                                })();
+                                onAttachmentChange(expense.id, f);
                               }}
                             />
                             {expense.attachment && (
-                              <div className="flex items-center gap-2 min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1 rounded-2xl border border-border bg-card px-3 py-2">
                                 {expense.attachment.type.includes("pdf") ? (
                                   <FileText className="h-4 w-4 text-destructive/70 shrink-0" />
                                 ) : (
@@ -464,7 +336,6 @@ export function ExpensesSection({
           })}
         </div>
 
-        {/* Footer — total consolidado (destaque) */}
         <div className="px-5 md:px-6 py-4 border-t border-border bg-primary/5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>

@@ -37,7 +37,7 @@ export function RequesterSection({ name, address, document, email, errors, onUpd
             value={name}
             onChange={(e) => onUpdate("requesterName", e.target.value)}
             placeholder="Seu nome completo"
-            className="h-12 rounded-xl bg-secondary border-border font-light"
+            className="bg-secondary border-border font-light"
           />
           {errors.requesterName && <p className="text-xs text-destructive">{errors.requesterName}</p>}
         </div>
@@ -52,7 +52,7 @@ export function RequesterSection({ name, address, document, email, errors, onUpd
             value={email}
             onChange={(e) => onUpdate("requesterEmail", e.target.value)}
             placeholder="seu@email.com"
-            className="h-12 rounded-xl bg-secondary border-border font-light"
+            className="bg-secondary border-border font-light"
           />
           {errors.requesterEmail && (
             <p className="text-xs text-destructive">{errors.requesterEmail}</p>
@@ -68,7 +68,7 @@ export function RequesterSection({ name, address, document, email, errors, onUpd
             value={document}
             onChange={(e) => onUpdate("requesterDocument", e.target.value)}
             placeholder="000.000.000-00"
-            className="h-12 rounded-xl bg-secondary border-border font-light"
+            className="bg-secondary border-border font-light"
           />
           {errors.requesterDocument && (
             <p className="text-xs text-destructive">{errors.requesterDocument}</p>
@@ -84,7 +84,7 @@ export function RequesterSection({ name, address, document, email, errors, onUpd
             value={address}
             onChange={(e) => onUpdate("requesterAddress", e.target.value)}
             placeholder="Seu endereço"
-            className="h-12 rounded-xl bg-secondary border-border font-light"
+            className="bg-secondary border-border font-light"
           />
         </div>
       </div>

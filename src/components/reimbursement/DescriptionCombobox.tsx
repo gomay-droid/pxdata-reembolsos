@@ -53,12 +53,12 @@ export function DescriptionCombobox({ inputId, value, onChange, error }: Props) 
           }}
           onFocus={() => setOpen(true)}
           placeholder="Digite ou escolha uma sugestão na lista"
-          className="h-12 rounded-xl bg-secondary border-border font-light"
+          className="bg-secondary border-border font-light"
           autoComplete="off"
         />
         {open && filtered.length > 0 && (
           <ul
-            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md"
+            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-2xl border border-border bg-popover p-1 text-popover-foreground shadow-refined"
             role="listbox"
           >
           {filtered.map((opt) => (

@@ -91,7 +91,7 @@ export function ExpenseEmailModal({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-9 w-9 shrink-0 p-0 rounded-xl"
+            className="h-9 w-9 shrink-0 p-0"
             onClick={onClose}
             aria-label="Fechar"
           >
@@ -106,7 +106,6 @@ export function ExpenseEmailModal({
               id="email-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="rounded-xl"
             />
           </div>
           <div className="space-y-2">
@@ -117,9 +116,9 @@ export function ExpenseEmailModal({
               onChange={(e) => setBody(e.target.value)}
               rows={14}
               className={cn(
-                "flex min-h-[200px] w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background",
-                "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                "disabled:cursor-not-allowed disabled:opacity-50"
+                "flex min-h-[200px] w-full rounded-2xl border border-input bg-secondary px-4 py-3 text-sm font-light ring-offset-background",
+                "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:border-foreground/25",
+                "disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-300"
               )}
             />
             {(kind === "reject" || kind === "contest") && (
@@ -131,11 +130,11 @@ export function ExpenseEmailModal({
         </div>
 
         <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border p-5 sm:flex-row sm:justify-end sm:gap-3">
-          <Button type="button" variant="outline" className="rounded-xl gap-2" onClick={copyAll}>
+          <Button type="button" variant="outline" className="gap-2" onClick={copyAll}>
             <Copy className="h-4 w-4" />
             Copiar e-mail
           </Button>
-          <Button type="button" className="rounded-xl gap-2" asChild>
+          <Button type="button" className="gap-2" asChild>
             <a href={mailtoHref}>
               <Mail className="h-4 w-4" />
               Abrir no e-mail

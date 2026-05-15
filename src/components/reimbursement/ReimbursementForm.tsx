@@ -39,8 +39,6 @@ export default function ReimbursementForm({
     addExpense,
     removeExpense,
     addExpensesFromFiles,
-    setExpenseProcessingState,
-    applyExpenseExtractionResult,
     updateExpense,
     updateExpenseLine,
     updateExpenseAttachment,
@@ -181,8 +179,6 @@ export default function ReimbursementForm({
           onAdd={addExpense}
           onRemove={removeExpense}
           addExpensesFromFiles={addExpensesFromFiles}
-          setExpenseProcessingState={setExpenseProcessingState}
-          applyExpenseExtractionResult={applyExpenseExtractionResult}
           onUpdate={updateExpense}
           onExpenseLineChange={updateExpenseLine}
           onAttachmentChange={updateExpenseAttachment}
@@ -195,7 +191,7 @@ export default function ReimbursementForm({
           size="lg"
           disabled={submitting}
           onClick={handleOpenReviewModal}
-          className="rounded-xl gap-2 px-8 h-12 text-base font-medium"
+          className="gap-2 px-8 h-12 text-base font-medium"
         >
           {submitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -250,7 +246,6 @@ export default function ReimbursementForm({
                   variant="outline"
                   onClick={() => setReviewModalOpen(false)}
                   disabled={submitting}
-                  className="rounded-xl"
                 >
                   Voltar e editar
                 </Button>
@@ -258,7 +253,7 @@ export default function ReimbursementForm({
                   type="button"
                   onClick={() => void handleConfirmSend()}
                   disabled={submitting || !reviewConfirmed}
-                  className="rounded-xl gap-2"
+                  className="gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
