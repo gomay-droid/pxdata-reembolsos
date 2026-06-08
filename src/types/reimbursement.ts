@@ -95,40 +95,17 @@ export const AI_PROGRAM_OPTIONS = [
   "Outros (não listado)",
 ];
 
-export const EXPENSE_LINES = [
-  "Viagem",
-  "Alimentação",
-  "Transporte",
-  "Hospedagem",
-  "Material de escritório",
-  "Software/Assinatura",
-  "Comunicação",
-  "Outros",
-];
-
-export const ACCOUNT_CODES = [
-  "4.1.01 - Despesas com viagens",
-  "4.1.02 - Despesas com alimentação",
-  "4.1.03 - Despesas com transporte",
-  "4.1.04 - Despesas com hospedagem",
-  "4.1.05 - Despesas administrativas",
-  "4.1.06 - Despesas com tecnologia",
-  "4.1.07 - Despesas com comunicação",
-  "4.1.99 - Outras despesas",
-];
-
-/** Conta contábil padrão para cada linha de despesa (preenchimento automático). */
-export const EXPENSE_LINE_TO_ACCOUNT_CODE: Record<(typeof EXPENSE_LINES)[number], string> = {
-  Viagem: "4.1.01 - Despesas com viagens",
-  Alimentação: "4.1.02 - Despesas com alimentação",
-  Transporte: "4.1.03 - Despesas com transporte",
-  Hospedagem: "4.1.04 - Despesas com hospedagem",
-  "Material de escritório": "4.1.05 - Despesas administrativas",
-  "Software/Assinatura": "4.1.06 - Despesas com tecnologia",
-  Comunicação: "4.1.07 - Despesas com comunicação",
-  Outros: "4.1.99 - Outras despesas",
-};
-
-export function accountCodeForExpenseLine(line: string): string {
-  return EXPENSE_LINE_TO_ACCOUNT_CODE[line as keyof typeof EXPENSE_LINE_TO_ACCOUNT_CODE] ?? "";
-}
+export {
+  EXPENSE_LINES,
+  ACCOUNT_CODES,
+  EXPENSE_LINE_TO_ACCOUNT_CODE,
+  SOFTWARE_SUBSCRIPTION_ACCOUNT_CODE,
+  accountCodeForExpenseLine,
+  buildSoftwareLicenseLine,
+  getMergedAccountCodes,
+  getMergedExpenseLines,
+  isCatalogExpenseLine,
+  resolveAccountCodeForLine,
+  resolveExpenseAccountCode,
+} from "@/lib/expenseCatalog";
+export type { ExpenseLineCatalog } from "@/lib/expenseCatalog";

@@ -1,8 +1,12 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import {
   Expense,
   ReimbursementFormData,
-  accountCodeForExpenseLine,
+  getMergedAccountCodes,
+  getMergedExpenseLines,
+  isCatalogExpenseLine,
+  resolveAccountCodeForLine,
+  SOFTWARE_SUBSCRIPTION_ACCOUNT_CODE,
   validateReceiptFile,
 } from "@/types/reimbursement";
 
@@ -73,6 +77,19 @@ export function useReimbursementForm() {
   formDataRef.current = formData;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** Linhas criadas automaticamente ao detectar assinatura de software (ex.: LICENCIAMENTO CLAUDE). */
+  const [dynamicExpenseLines, setDynamicExpenseLines] = useState<Record<string, string>>({});
+  const dynamicExpenseLinesRef = useRef(dynamicExpenseLines);
+  dynamicExpenseLinesRef.current = dynamicExpenseLines;
+
+  const expenseLineOptions = useMemo(
+    () => getMergedExpenseLines(dynamicExpenseLines),
+    [dynamicExpenseLines]
+  );
+  const accountCodeOptions = useMemo(
+    () => getMergedAccountCodes(dynamicExpenseLines),
+    [dynamicExpenseLines]
+  );
 
   const setExpenseProcessingState = useCallback(
     (
@@ -218,10 +235,17 @@ export function useReimbursementForm() {
             next.description = data.description.trim();
           }
           if (data.expenseLine?.trim()) {
-            next.expenseLine = data.expenseLine.trim();
-            next.accountCode = accountCodeForExpenseLine(next.expenseLine);
-          }
-          if (data.accountCode?.trim() && !next.accountCode.trim()) {
+            const line = data.expenseLine.trim();
+            const code =
+              data.accountCode?.trim() ||
+              resolveAccountCodeForLine(line, dynamicExpenseLinesRef.current) ||
+              SOFTWARE_SUBSCRIPTION_ACCOUNT_CODE;
+            next.expenseLine = line;
+            next.accountCode = code;
+            if (!isCatalogExpenseLine(line)) {
+              setDynamicExpenseLines((prev) => ({ ...prev, [line]: code }));
+            }
+          } else if (data.accountCode?.trim()) {
             next.accountCode = data.accountCode.trim();
           }
           if (typeof data.amountBRL === "number" && data.amountBRL > 0) {
@@ -244,7 +268,9 @@ export function useReimbursementForm() {
   );
 
   const updateExpenseLine = useCallback((id: number, expenseLine: string) => {
-    const accountCode = accountCodeForExpenseLine(expenseLine);
+    const accountCode =
+      resolveAccountCodeForLine(expenseLine, dynamicExpenseLinesRef.current) ||
+      SOFTWARE_SUBSCRIPTION_ACCOUNT_CODE;
     setFormData((prev) => ({
       ...prev,
       expenses: prev.expenses.map((e) =>
@@ -346,12 +372,15 @@ export function useReimbursementForm() {
       expenses: [createEmptyExpense(1)],
     });
     setErrors({});
+    setDynamicExpenseLines({});
   }, []);
 
   return {
     formData,
     errors,
     totalAmount,
+    expenseLineOptions,
+    accountCodeOptions,
     updateField,
     addExpense,
     removeExpense,

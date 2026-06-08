@@ -35,6 +35,8 @@ export default function ReimbursementForm({
     formData,
     errors,
     totalAmount,
+    expenseLineOptions,
+    accountCodeOptions,
     updateField,
     addExpense,
     removeExpense,
@@ -178,6 +180,8 @@ export default function ReimbursementForm({
           expenses={formData.expenses}
           errors={errors}
           totalAmount={totalAmount}
+          expenseLineOptions={expenseLineOptions}
+          accountCodeOptions={accountCodeOptions}
           onAdd={addExpense}
           onRemove={removeExpense}
           addExpensesFromFiles={addExpensesFromFiles}
@@ -233,6 +237,8 @@ export default function ReimbursementForm({
                 expenses={formData.expenses}
                 errors={errors}
                 totalAmount={totalAmount}
+                expenseLineOptions={expenseLineOptions}
+                accountCodeOptions={accountCodeOptions}
                 onUpdate={updateExpense}
                 onExpenseLineChange={updateExpenseLine}
                 onCnpjConfirmedChange={setExpenseCnpjConfirmed}

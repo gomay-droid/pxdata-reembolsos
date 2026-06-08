@@ -1,5 +1,11 @@
 import { PDFParse } from "pdf-parse";
 import { createWorker } from "tesseract.js";
+import {
+  accountCodeForExpenseLine,
+  buildSoftwareLicenseLine,
+  isCatalogExpenseLine,
+  SOFTWARE_SUBSCRIPTION_ACCOUNT_CODE,
+} from "../src/lib/expenseCatalog.ts";
 
 export async function extractTextFromBuffer(
   buffer: Buffer,
@@ -53,24 +59,71 @@ export function buildExtractionHints(text: string) {
   };
 }
 
-/** BRL: R$ 1.234,56 ou 1.234,56 */
+/** `$` faz parte de `R$`? (evita tratar R$110.00 como USD 110.00) */
+function isDollarSignForUsd(text: string, dollarIndex: number): boolean {
+  return dollarIndex <= 0 || text[dollarIndex - 1] !== "R";
+}
+
+/** Extrai tokens USD do texto ($ / US$), ignorando o `$` de valores em real (R$). */
+function collectUsdTokens(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(/US\$\s*[\d.,]+/gi)) out.push(m[0]);
+  for (const m of text.matchAll(/\$\s*[\d,]+\.\d{2}\b/g)) {
+    if (m.index != null && !isDollarSignForUsd(text, m.index)) continue;
+    out.push(m[0].trim());
+  }
+  for (const m of text.matchAll(/\b([\d,]+\.\d{2})\s*USD\b/gi)) {
+    out.push("$" + m[1].replace(/,/g, ""));
+  }
+  return [...new Set(out.map((x) => x.replace(/\s+/g, " ").trim()))];
+}
+
+/**
+ * BRL: suporta formato brasileiro (1.234,56) e faturas internacionais com R$ e ponto decimal (R$110.00).
+ */
 function brlToNumber(token: string): number | null {
   const s = token.replace(/R\$\s*/gi, "").replace(/\s/g, "").trim();
   if (!s) return null;
+
   const lastComma = s.lastIndexOf(",");
-  if (lastComma === -1) {
-    const n = parseFloat(s.replace(/\./g, ""));
+  const lastDot = s.lastIndexOf(".");
+
+  // Brasileiro: vírgula decimal (ex.: 1.234,56)
+  if (lastComma !== -1 && lastComma > lastDot && /,\d{1,2}$/.test(s)) {
+    const intPart = s.slice(0, lastComma).replace(/\./g, "");
+    const dec = s.slice(lastComma + 1);
+    if (!/^\d{1,2}$/.test(dec)) return null;
+    const n = parseFloat(`${intPart}.${dec.padEnd(2, "0").slice(0, 2)}`);
     return Number.isFinite(n) && n > 0 ? n : null;
   }
-  const intPart = s.slice(0, lastComma).replace(/\./g, "");
-  const dec = s.slice(lastComma + 1);
-  if (!/^\d{1,2}$/.test(dec)) return null;
-  const n = parseFloat(`${intPart}.${dec.padEnd(2, "0").slice(0, 2)}`);
-  return Number.isFinite(n) && n > 0 ? n : null;
+
+  // Ponto decimal (ex.: R$110.00, 1,234.56 em nota internacional)
+  if (lastDot !== -1 && /\.\d{1,2}$/.test(s)) {
+    if (lastComma !== -1 && lastComma < lastDot) {
+      const n = parseFloat(s.replace(/,/g, ""));
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    if (lastComma === -1) {
+      if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+        const n = parseFloat(s.replace(/\./g, ""));
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
+      const n = parseFloat(s);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+  }
+
+  if (lastComma === -1 && lastDot === -1 && /^\d+$/.test(s)) {
+    const n = parseFloat(s);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  return null;
 }
 
-/** USD comum em faturas SaaS: $20.00, US$ 20.00, $1,234.56 */
+/** USD: $20.00, US$ 20.00 — nunca R$ */
 function usdToNumber(token: string): number | null {
+  if (/^R\$/i.test(token.trim())) return null;
   const cleaned = token.replace(/US\$/gi, "$").trim();
   const m = cleaned.match(/\$\s*([\d,]+)\.(\d{2})\b/);
   if (!m) return null;
@@ -82,7 +135,9 @@ function usdToNumber(token: string): number | null {
 function parseMoneyToken(raw: string): number | null {
   const t = raw.trim();
   if (!t) return null;
-  if (/\$\s*[\d,]+\.\d{2}/.test(t) || /US\$/i.test(t)) return usdToNumber(t);
+  if (/^R\$/i.test(t)) return brlToNumber(t);
+  if (/US\$/i.test(t)) return usdToNumber(t);
+  if (/\$\s*[\d,]+\.\d{2}/.test(t)) return usdToNumber(t);
   return brlToNumber(t);
 }
 
@@ -98,13 +153,7 @@ function collectMoneyTokens(text: string): string[] {
   const out: string[] = [];
 
   for (const m of t.matchAll(/R\$\s*[\d.,]+/gi)) out.push(m[0]);
-  for (const m of t.matchAll(/US\$\s*[\d.,]+/gi)) out.push(m[0]);
-  for (const m of t.matchAll(/\$\s*[\d,]+\.\d{2}\b/g)) out.push(m[0].trim());
-
-  // 20.00 USD, 1,234.56 USD (faturas internacionais)
-  for (const m of t.matchAll(/\b([\d,]+\.\d{2})\s*USD\b/gi)) {
-    out.push("$" + m[1].replace(/,/g, ""));
-  }
+  out.push(...collectUsdTokens(t));
 
   // Valor brasileiro sem R$: 1.234,56 ou 119,00 (evita pegar só ano de 4 dígitos)
   for (const m of t.matchAll(/\b\d{1,3}(?:\.\d{3})*,\d{2}\b/g)) {
@@ -138,7 +187,7 @@ export function buildPdfBillingHints(text: string) {
   if (keywordLine) {
     const subTokens: string[] = [];
     for (const m of keywordLine.matchAll(/R\$\s*[\d.,]+/gi)) subTokens.push(m[0]);
-    for (const m of keywordLine.matchAll(/\$\s*[\d,]+\.\d{2}\b/g)) subTokens.push(m[0].trim());
+    for (const tok of collectUsdTokens(keywordLine)) subTokens.push(tok);
     for (const m of keywordLine.matchAll(/\b\d{1,3}(?:\.\d{3})*,\d{2}\b/g)) subTokens.push(m[0]);
     const parsed = subTokens.map(parseMoneyToken).filter((n): n is number => n !== null && n > 0);
     if (parsed.length) {
@@ -211,19 +260,9 @@ export function buildHintsByDocKind(text: string, docKind: string, mime: string)
   };
 }
 
-export type ExpenseLineExtracted =
-  | "Viagem"
-  | "Alimentação"
-  | "Transporte"
-  | "Hospedagem"
-  | "Material de escritório"
-  | "Software/Assinatura"
-  | "Comunicação"
-  | "Outros";
-
 export type ReceiptExtractionResult = {
   description: string | null;
-  expenseLine: ExpenseLineExtracted | null;
+  expenseLine: string | null;
   accountCode: string | null;
   amountBRL: number | null;
   amountUSD: number | null;
@@ -231,26 +270,32 @@ export type ReceiptExtractionResult = {
   confidence: "low" | "medium" | "high";
 };
 
-const EXPENSE_LINE_KEYWORDS: Array<{ line: ExpenseLineExtracted; re: RegExp }> = [
-  { line: "Transporte", re: /\b(uber|99|taxi|cabify|corrida|ped[aá]gio|combust[ií]vel|posto)\b/i },
-  { line: "Alimentação", re: /\b(restaurante|lanchonete|almo[cç]o|jantar|caf[eé]|ifood|food)\b/i },
-  { line: "Hospedagem", re: /\b(hotel|hospedagem|pousada|booking|airbnb|di[aá]ria)\b/i },
-  { line: "Software/Assinatura", re: /\b(license|licen[cç]a|subscription|assinatura|openai|anthropic|google|aws|microsoft)\b/i },
-  { line: "Comunicação", re: /\b(internet|telefone|celular|whatsapp|zoom|meet)\b/i },
-  { line: "Viagem", re: /\b(passagem|voo|a[ée]reo|rodovi[aá]ria|viagem)\b/i },
-  { line: "Material de escritório", re: /\b(papelaria|material|escrit[oó]rio|caneta|impress[aã]o)\b/i },
+const EXPENSE_LINE_KEYWORDS: Array<{ line: string; re: RegExp }> = [
+  { line: "TRANSPORTE", re: /\b(uber|99|taxi|cabify|corrida|combust[ií]vel|posto)\b/i },
+  { line: "PEDÁGIO", re: /\bped[aá]gio\b/i },
+  { line: "ESTACIONAMENTO", re: /\bestacionamento\b/i },
+  { line: "PASSAGENS", re: /\b(passagem|voo|a[ée]reo|rodovi[aá]ria)\b/i },
+  { line: "ALIMENTAÇÃO", re: /\b(restaurante|lanchonete|almo[cç]o|jantar|caf[eé]|ifood|lanche)\b/i },
+  { line: "HOSPEDAGEM", re: /\b(hotel|hospedagem|pousada|booking|airbnb|di[aá]ria)\b/i },
+  { line: "MATERIAL DE ESCRITÓRIO", re: /\b(papelaria|material|escrit[oó]rio|caneta|impress[aã]o)\b/i },
+  { line: "TELEFONIA", re: /\b(telefone|celular|telefonia)\b/i },
+  { line: "LICENCIAMENTO CURSOR", re: /\bcursor\b/i },
+  { line: "LICENCIAMENTO OPEN AI", re: /\b(openai|chat\s*gpt|gpt-4|gpt-3)\b/i },
+  { line: "LICENCIAMENTO CHAT GPT", re: /\bchatgpt\b/i },
+  { line: "LICENCIAMENTO FIGMA", re: /\bfigma\b/i },
+  { line: "LICENCIAMENTO GITHUB", re: /\bgithub\b/i },
+  { line: "LICENCIAMENTO GOOGLE CLOUD", re: /\bgoogle cloud\b/i },
+  { line: "LICENCIAMENTO GOOGLE INTERNET", re: /\bgoogle workspace|g suite\b/i },
+  { line: "LICENCIAMENTO CANVA", re: /\bcanva\b/i },
+  { line: "LICENCIAMENTO CLICKUP", re: /\bclickup\b/i },
+  { line: "LICENCIAMENTO HUBSPOT", re: /\bhubspot\b/i },
+  { line: "LICENCIAMENTO POSTMAN", re: /\bpostman\b/i },
+  { line: "LICENCIAMENTO SONARCLOUD", re: /\bsonarcloud\b/i },
+  { line: "LICENCIAMENTO DOCUSIGN", re: /\bdocusign\b/i },
+  { line: "LICENCIAMENTO LOVABLE", re: /\blovable\b/i },
+  { line: "LICENCIAMENTO LINKEDIN", re: /\blinkedin\b/i },
+  { line: "DOMÍNIOS GO DADDY", re: /\b(go\s?daddy|godaddy)\b/i },
 ];
-
-const ACCOUNT_CODE_BY_LINE: Record<ExpenseLineExtracted, string> = {
-  Viagem: "4.1.01 - Despesas com viagens",
-  Alimentação: "4.1.02 - Despesas com alimentação",
-  Transporte: "4.1.03 - Despesas com transporte",
-  Hospedagem: "4.1.04 - Despesas com hospedagem",
-  "Material de escritório": "4.1.05 - Despesas administrativas",
-  "Software/Assinatura": "4.1.06 - Despesas com tecnologia",
-  Comunicação: "4.1.07 - Despesas com comunicação",
-  Outros: "4.1.99 - Outras despesas",
-};
 
 function normalizeDigits(s: string): string {
   return s.replace(/\D+/g, "");
@@ -276,43 +321,99 @@ function extractAmountBRL(text: string): number | null {
 }
 
 function extractAmountUSD(text: string): number | null {
-  const tokens = [
-    ...[...text.matchAll(/US\$\s*[\d.,]+/gi)].map((m) => m[0]),
-    ...[...text.matchAll(/\$\s*[\d,]+\.\d{2}\b/g)].map((m) => m[0]),
-  ];
+  const tokens = collectUsdTokens(text);
   const numbers = tokens.map((t) => usdToNumber(t)).filter((n): n is number => n !== null && n > 0);
   if (!numbers.length) return null;
   return Math.max(...numbers);
 }
 
-function inferExpenseLine(text: string): ExpenseLineExtracted {
-  for (const entry of EXPENSE_LINE_KEYWORDS) {
-    if (entry.re.test(text)) return entry.line;
-  }
-  return "Outros";
+/** Fornecedores SaaS ainda não listados no catálogo fixo — gera LICENCIAMENTO {NOME}. */
+const DYNAMIC_SOFTWARE_VENDOR_HINTS: Array<{ re: RegExp; label: string }> = [
+  { re: /\bclaude\b/i, label: "CLAUDE" },
+  { re: /\banthropic\b/i, label: "ANTHROPIC" },
+  { re: /\bnotion\b/i, label: "NOTION" },
+  { re: /\bslack\b/i, label: "SLACK" },
+  { re: /\bzoom\b/i, label: "ZOOM" },
+  { re: /\blinear\b/i, label: "LINEAR" },
+  { re: /\bvercel\b/i, label: "VERCEL" },
+  { re: /\bnetlify\b/i, label: "NETLIFY" },
+  { re: /\bstripe\b/i, label: "STRIPE" },
+  { re: /\batlassian\b/i, label: "ATLASSIAN" },
+  { re: /\bjira\b/i, label: "JIRA" },
+  { re: /\bconfluence\b/i, label: "CONFLUENCE" },
+  { re: /\bmiro\b/i, label: "MIRO" },
+  { re: /\b1password\b/i, label: "1PASSWORD" },
+  { re: /\blastpass\b/i, label: "LASTPASS" },
+];
+
+function looksLikeSoftwareSubscription(haystack: string): boolean {
+  return (
+    /\b(subscription|assinatura|saas|license|licen[cç]a|software)\b/i.test(haystack) ||
+    (/\b(invoice|fatura|receipt|recibo)\b/i.test(haystack) &&
+      /\b(pro|plus|premium|team|enterprise|monthly|anual|annual)\b/i.test(haystack))
+  );
 }
 
-function inferDescription(text: string, filename: string, line: ExpenseLineExtracted): string {
+function inferDynamicSoftwareLicenseLine(text: string, filename: string): string | null {
+  const haystack = `${text}\n${filename}`;
+  const hasSoftwareSignal =
+    looksLikeSoftwareSubscription(haystack) ||
+    DYNAMIC_SOFTWARE_VENDOR_HINTS.some((h) => h.re.test(haystack));
+
+  if (!hasSoftwareSignal) return null;
+
+  for (const { re, label } of DYNAMIC_SOFTWARE_VENDOR_HINTS) {
+    if (!re.test(haystack)) continue;
+    const line = buildSoftwareLicenseLine(label);
+    if (!isCatalogExpenseLine(line)) return line;
+  }
+
+  const proMatch = haystack.match(/\b([A-Za-z][A-Za-z0-9.+\\-]{1,24})\s+Pro\b/);
+  if (proMatch) {
+    const line = buildSoftwareLicenseLine(proMatch[1]);
+    if (!isCatalogExpenseLine(line)) return line;
+  }
+
+  return null;
+}
+
+function inferExpenseLine(text: string, filename: string): string | null {
+  const haystack = `${text}\n${filename}`;
+  for (const entry of EXPENSE_LINE_KEYWORDS) {
+    if (entry.re.test(haystack)) return entry.line;
+  }
+  return inferDynamicSoftwareLicenseLine(text, filename);
+}
+
+function accountCodeForExtractedLine(line: string): string {
+  if (isCatalogExpenseLine(line)) return accountCodeForExpenseLine(line);
+  return SOFTWARE_SUBSCRIPTION_ACCOUNT_CODE;
+}
+
+function inferDescription(text: string, filename: string, line: string | null): string {
+  if (/\bclaude(\s+pro)?\b/i.test(text)) return "Claude Pro";
   if (/\buber\b/i.test(text)) return "Corrida Uber";
   if (/ifood/i.test(text)) return "Pedido iFood";
   if (/\bhotel|airbnb|booking\b/i.test(text)) return "Hospedagem";
-  if (/openai|anthropic|google|aws|microsoft/i.test(text)) return "Assinatura de software";
+  if (/openai|chatgpt/i.test(text)) return "ChatGPT";
+  if (/anthropic/i.test(text)) return "Assinatura Anthropic";
+  if (/openai|google|aws|microsoft/i.test(text)) return "Assinatura de software";
   const baseName = filename.replace(/\.[a-z0-9]+$/i, "").trim();
   if (baseName) return baseName;
-  return line === "Outros" ? "Despesa com comprovante" : `${line} (nota)`;
+  return line ? `${line} (nota)` : "Despesa com comprovante";
 }
 
 export function buildReceiptExtraction(text: string, filename: string): ReceiptExtractionResult {
   const normalized = normalizePdfText(text);
-  const line = inferExpenseLine(normalized);
+  const line = inferExpenseLine(normalized, filename);
   const amountBRL = extractAmountBRL(normalized);
   const amountUSD = extractAmountUSD(normalized);
   const supplierCnpj = extractCnpj(normalized);
   const description = inferDescription(normalized, filename, line);
-  const accountCode = ACCOUNT_CODE_BY_LINE[line] ?? ACCOUNT_CODE_BY_LINE.Outros;
+  const accountCode = line ? accountCodeForExtractedLine(line) : null;
 
   let confidence: ReceiptExtractionResult["confidence"] = "low";
-  const signals = [amountBRL !== null || amountUSD !== null, Boolean(supplierCnpj), line !== "Outros"].filter(
+  const signals = [amountBRL !== null || amountUSD !== null, Boolean(supplierCnpj), Boolean(line)].filter(
     Boolean
   ).length;
   if (signals >= 3) confidence = "high";

@@ -562,6 +562,62 @@ app.get("/api/admin/reimbursements/:id", requireAuth, requireAdmin, async (req, 
   }
 });
 
+app.get("/api/admin/reimbursements/:id/spreadsheet", requireAuth, requireAdmin, async (req, res) => {
+  const dbId = parseDbIdFromPublicId(req.params.id);
+  if (dbId === null) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+  try {
+    await ensureCompanySettings();
+    const [reimbursement, company] = await Promise.all([
+      prisma.reimbursement.findUnique({
+        where: { id: dbId },
+        include: { expenses: { orderBy: { id: "asc" } } },
+      }),
+      prisma.companySettings.findUnique({ where: { id: 1 } }),
+    ]);
+    if (!reimbursement) return res.status(404).json({ error: "Reembolso não encontrado" });
+    if (!company) return res.status(500).json({ error: "Dados da empresa não configurados" });
+
+    const { buildReimbursementSpreadsheetBuffer, reimbursementSpreadsheetFilename } = await import(
+      "./exportExpenseSpreadsheet.js"
+    );
+    const publicId = formatReimbursementId(reimbursement.id);
+    const buffer = await buildReimbursementSpreadsheetBuffer({
+      reimbursementId: publicId,
+      createdAt: reimbursement.createdAt,
+      requesterName: reimbursement.requesterName,
+      requesterAddress: reimbursement.requesterAddress,
+      requesterDocument: reimbursement.requesterDocument,
+      requesterEmail: reimbursement.requesterEmail,
+      company: {
+        name: company.name,
+        address: company.address,
+        cnpj: company.cnpj,
+        email: company.email,
+      },
+      expenses: reimbursement.expenses.map((e) => ({
+        description: e.description,
+        expenseLine: e.expenseLine,
+        accountCode: e.accountCode,
+        amount: e.amount,
+      })),
+    });
+
+    const filename = reimbursementSpreadsheetFilename(publicId);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (e) {
+    console.error("[admin/spreadsheet]", e);
+    const msg = e instanceof Error ? e.message : "Erro ao gerar planilha";
+    res.status(500).json({ error: msg });
+  }
+});
+
 app.get("/api/admin/metrics", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const rows = await prisma.reimbursement.findMany({

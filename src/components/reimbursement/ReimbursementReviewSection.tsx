@@ -1,4 +1,4 @@
-import { Expense, EXPENSE_LINES, ACCOUNT_CODES } from "@/types/reimbursement";
+import { Expense } from "@/types/reimbursement";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,8 @@ interface Props {
   expenses: Expense[];
   errors: Record<string, string>;
   totalAmount: number;
+  expenseLineOptions: string[];
+  accountCodeOptions: string[];
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onCnpjConfirmedChange: (id: number, checked: boolean) => void;
@@ -21,6 +23,8 @@ export function ReimbursementReviewSection({
   expenses,
   errors,
   totalAmount,
+  expenseLineOptions,
+  accountCodeOptions,
   onUpdate,
   onExpenseLineChange,
   onCnpjConfirmedChange,
@@ -70,7 +74,7 @@ export function ReimbursementReviewSection({
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXPENSE_LINES.map((line) => (
+                    {expenseLineOptions.map((line) => (
                       <SelectItem key={line} value={line}>
                         {line}
                       </SelectItem>
@@ -89,7 +93,7 @@ export function ReimbursementReviewSection({
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACCOUNT_CODES.map((code) => (
+                    {accountCodeOptions.map((code) => (
                       <SelectItem key={code} value={code}>
                         {code}
                       </SelectItem>

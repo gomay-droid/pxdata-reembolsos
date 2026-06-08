@@ -20,6 +20,7 @@ import {
   Loader2,
   Mail,
   MessageSquareWarning,
+  Sheet,
   Shield,
   X,
   XCircle,
@@ -102,6 +103,7 @@ export default function AdminPage() {
   /** Bloqueia segundo clique antes do re-render (PATCH em andamento). */
   const statusPatchLockRef = useRef(false);
   const [patchingDecision, setPatchingDecision] = useState<AdminReimbursementDecision | null>(null);
+  const [downloadingSpreadsheet, setDownloadingSpreadsheet] = useState(false);
 
   const submitAdminDecision = useCallback(
     async (decision: AdminReimbursementDecision) => {
@@ -197,6 +199,35 @@ export default function AdminPage() {
       setSelected(data);
     } finally {
       setLoadingSelected(false);
+    }
+  }, []);
+
+  const downloadReimbursementSpreadsheet = useCallback(async (reimbursementId: string) => {
+    setDownloadingSpreadsheet(true);
+    try {
+      const res = await fetch(
+        apiUrl(`/api/admin/reimbursements/${encodeURIComponent(reimbursementId)}/spreadsheet`),
+        { credentials: "include" }
+      );
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(data.error ?? "Não foi possível baixar a planilha");
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+      const filename = match?.[1] ?? `nota-debito-${reimbursementId}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Falha ao baixar a planilha");
+    } finally {
+      setDownloadingSpreadsheet(false);
     }
   }, []);
 
@@ -440,7 +471,32 @@ export default function AdminPage() {
               )}
 
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Itens</h3>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground">
+                      Despesas · {selected.expenses.length}{" "}
+                      {selected.expenses.length === 1 ? "item" : "itens"}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      A planilha PX exporta todos os itens desta solicitação em um único arquivo.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5 h-9 shrink-0"
+                    disabled={downloadingSpreadsheet || selected.expenses.length === 0}
+                    onClick={() => void downloadReimbursementSpreadsheet(selected.id)}
+                  >
+                    {downloadingSpreadsheet ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sheet className="h-3.5 w-3.5" />
+                    )}
+                    Baixar planilha PX
+                  </Button>
+                </div>
                 <div className="rounded-2xl border border-border overflow-hidden">
                   <div className="divide-y divide-border">
                     {selected.expenses.map((e) => (

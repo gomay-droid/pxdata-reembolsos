@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Expense, EXPENSE_LINES, ACCOUNT_CODES, RECEIPT_ACCEPT_ATTR } from "@/types/reimbursement";
+import { Expense, RECEIPT_ACCEPT_ATTR } from "@/types/reimbursement";
 import { DescriptionCombobox } from "@/components/reimbursement/DescriptionCombobox";
 import {
   AlertCircle,
@@ -35,6 +35,8 @@ interface Props {
   expenses: Expense[];
   errors: Record<string, string>;
   totalAmount: number;
+  expenseLineOptions: string[];
+  accountCodeOptions: string[];
   onAdd: () => void;
   onRemove: (id: number) => void;
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
@@ -66,6 +68,8 @@ export function ExpensesSection({
   expenses,
   errors,
   totalAmount,
+  expenseLineOptions,
+  accountCodeOptions,
   onAdd,
   onRemove,
   onUpdate,
@@ -312,7 +316,7 @@ export function ExpensesSection({
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
-                              {EXPENSE_LINES.map((line) => (
+                              {expenseLineOptions.map((line) => (
                                 <SelectItem key={line} value={line}>
                                   {line}
                                 </SelectItem>
@@ -336,7 +340,7 @@ export function ExpensesSection({
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
-                              {ACCOUNT_CODES.map((code) => (
+                              {accountCodeOptions.map((code) => (
                                 <SelectItem key={code} value={code}>
                                   {code}
                                 </SelectItem>
