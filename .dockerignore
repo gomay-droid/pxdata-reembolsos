@@ -6,7 +6,10 @@ dist
 uploads
 *.log
 .vercel
+# Front React (não vai na imagem da API), exceto lib compartilhada com o servidor.
 src
+!src/lib
+!src/lib/**
 index.html
 vite.config.ts
 tailwind.config.ts
