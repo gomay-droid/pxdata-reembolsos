@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { expenseLineOptionsWithCurrent } from "@/lib/expenseCatalog";
 import { Expense, RECEIPT_ACCEPT_ATTR } from "@/types/reimbursement";
 import { DescriptionCombobox } from "@/components/reimbursement/DescriptionCombobox";
 import {
@@ -316,7 +317,10 @@ export function ExpensesSection({
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
-                              {expenseLineOptions.map((line) => (
+                              {expenseLineOptionsWithCurrent(
+                                expenseLineOptions,
+                                expense.expenseLine
+                              ).map((line) => (
                                 <SelectItem key={line} value={line}>
                                   {line}
                                 </SelectItem>
