@@ -1,3 +1,4 @@
+import { expenseLineOptionsWithCurrent } from "@/lib/expenseCatalog";
 import { Expense } from "@/types/reimbursement";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -135,11 +136,13 @@ export function ReimbursementReviewSection({
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {expenseLineOptions.map((line) => (
-                      <SelectItem key={line} value={line}>
-                        {line}
-                      </SelectItem>
-                    ))}
+                    {expenseLineOptionsWithCurrent(expenseLineOptions, expense.expenseLine).map(
+                      (line) => (
+                        <SelectItem key={line} value={line}>
+                          {line}
+                        </SelectItem>
+                      )
+                    )}
                   </SelectContent>
                 </Select>
                 {errors[`expense_${expense.id}_expenseLine`] && (

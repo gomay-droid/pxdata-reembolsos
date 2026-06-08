@@ -73,14 +73,12 @@ function inferDynamicSoftwareLicenseLine(text: string, filename: string): string
 
   for (const { re, label } of DYNAMIC_SOFTWARE_VENDOR_HINTS) {
     if (!re.test(haystack)) continue;
-    const line = buildSoftwareLicenseLine(label);
-    if (!isCatalogExpenseLine(line)) return line;
+    return buildSoftwareLicenseLine(label);
   }
 
   const proMatch = haystack.match(/\b([A-Za-z][A-Za-z0-9.+\-]{1,24})\s+Pro\b/);
   if (proMatch) {
-    const line = buildSoftwareLicenseLine(proMatch[1]);
-    if (!isCatalogExpenseLine(line)) return line;
+    return buildSoftwareLicenseLine(proMatch[1]);
   }
 
   return null;

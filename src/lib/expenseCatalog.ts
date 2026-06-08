@@ -68,6 +68,16 @@ export function getMergedExpenseLines(dynamicLines: Record<string, string> = {})
   return [...EXPENSE_LINES, ...extra];
 }
 
+/** Garante que a linha já selecionada apareça no Select (Radix exige valor na lista). */
+export function expenseLineOptionsWithCurrent(
+  options: string[],
+  current?: string | null
+): string[] {
+  const value = current?.trim();
+  if (!value || options.includes(value)) return options;
+  return [...options, value];
+}
+
 export function getMergedAccountCodes(dynamicLines: Record<string, string> = {}): string[] {
   const codes = new Set<string>([...ACCOUNT_CODES, ...Object.values(dynamicLines)]);
   return [...codes].sort();

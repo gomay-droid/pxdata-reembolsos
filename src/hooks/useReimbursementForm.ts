@@ -279,14 +279,26 @@ export function useReimbursementForm() {
           if (e.id !== id) return e;
           let next: Expense = { ...e };
 
-          if (data.description?.trim() && !next.description.trim()) {
+          if (data.description?.trim()) {
             next.description = data.description.trim();
           }
 
-          let line = data.expenseLine?.trim() || "";
-          if (!line) {
-            const haystack = `${next.description}\n${data.description ?? ""}`;
-            line = inferExpenseLineFromText(haystack, e.attachment?.name ?? "") ?? "";
+          const haystack = [
+            data.expenseLine,
+            next.description,
+            data.description,
+          ]
+            .filter((part) => typeof part === "string" && part.trim())
+            .join("\n");
+
+          let line =
+            data.expenseLine?.trim() ||
+            inferExpenseLineFromText(haystack, e.attachment?.name ?? "") ||
+            "";
+
+          if (!line && next.description.trim()) {
+            line =
+              inferExpenseLineFromText(next.description, e.attachment?.name ?? "") || "";
           }
 
           if (line) {
