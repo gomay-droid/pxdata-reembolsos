@@ -13,6 +13,7 @@ COPY prisma ./prisma/
 RUN npm ci
 
 COPY server ./server/
+COPY src/lib ./src/lib/
 
 RUN npx prisma generate
 
