@@ -6,6 +6,9 @@ import { AlertTriangle, ClipboardCheck, DollarSign } from "lucide-react";
 
 interface Props {
   expenses: Expense[];
+  requesterName: string;
+  requesterEmail: string;
+  requesterDocument: string;
   errors: Record<string, string>;
   totalAmount: number;
   expenseLineOptions: string[];
@@ -13,6 +16,10 @@ interface Props {
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onCnpjConfirmedChange: (id: number, checked: boolean) => void;
+  onRequesterUpdate: (
+    field: "requesterName" | "requesterEmail" | "requesterDocument",
+    value: string
+  ) => void;
   reviewed: boolean;
   onReviewedChange: (checked: boolean) => void;
   className?: string;
@@ -21,6 +28,9 @@ interface Props {
 
 export function ReimbursementReviewSection({
   expenses,
+  requesterName,
+  requesterEmail,
+  requesterDocument,
   errors,
   totalAmount,
   expenseLineOptions,
@@ -28,11 +38,17 @@ export function ReimbursementReviewSection({
   onUpdate,
   onExpenseLineChange,
   onCnpjConfirmedChange,
+  onRequesterUpdate,
   reviewed,
   onReviewedChange,
   className,
   expensesContainerClassName,
 }: Props) {
+  const hasRequesterErrors =
+    Boolean(errors.requesterName) ||
+    Boolean(errors.requesterEmail) ||
+    Boolean(errors.requesterDocument);
+
   return (
     <div className={className ?? "rounded-2xl border border-border bg-card p-6 md:p-8 space-y-5"}>
       <div className="flex items-start gap-3">
@@ -44,6 +60,51 @@ export function ReimbursementReviewSection({
           <p className="text-sm text-muted-foreground mt-1 font-light">
             Confira e ajuste os dados extraídos. Esta etapa é obrigatória antes do envio.
           </p>
+        </div>
+      </div>
+
+      <div
+        className={`rounded-2xl border p-4 space-y-3 ${
+          hasRequesterErrors ? "border-destructive/40 bg-destructive/5" : "border-border bg-muted/20"
+        }`}
+      >
+        <p className="text-sm font-medium text-foreground">Dados do solicitante</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">Nome *</Label>
+            <Input
+              value={requesterName}
+              onChange={(e) => onRequesterUpdate("requesterName", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.requesterName && (
+              <p className="text-xs text-destructive">{errors.requesterName}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">E-mail *</Label>
+            <Input
+              type="email"
+              value={requesterEmail}
+              onChange={(e) => onRequesterUpdate("requesterEmail", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.requesterEmail && (
+              <p className="text-xs text-destructive">{errors.requesterEmail}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">CPF/CNPJ *</Label>
+            <Input
+              value={requesterDocument}
+              onChange={(e) => onRequesterUpdate("requesterDocument", e.target.value)}
+              placeholder="000.000.000-00"
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.requesterDocument && (
+              <p className="text-xs text-destructive">{errors.requesterDocument}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -81,6 +142,9 @@ export function ReimbursementReviewSection({
                     ))}
                   </SelectContent>
                 </Select>
+                {errors[`expense_${expense.id}_expenseLine`] && (
+                  <p className="text-xs text-destructive">{errors[`expense_${expense.id}_expenseLine`]}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -126,9 +190,9 @@ export function ReimbursementReviewSection({
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Valor em R$</Label>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
                   value={expense.amount}
                   onChange={(e) => onUpdate(expense.id, "amount", e.target.value)}
                   className="h-11 bg-card border-border font-light"
@@ -150,6 +214,12 @@ export function ReimbursementReviewSection({
                 />
               </div>
             </div>
+            {errors[`expense_${expense.id}_attachment`] && (
+              <p className="text-xs text-destructive">{errors[`expense_${expense.id}_attachment`]}</p>
+            )}
+            {errors[`expense_${expense.id}_processing`] && (
+              <p className="text-xs text-destructive">{errors[`expense_${expense.id}_processing`]}</p>
+            )}
           </div>
         ))}
       </div>

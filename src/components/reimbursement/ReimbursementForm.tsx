@@ -8,6 +8,7 @@ import { ReimbursementReviewSection } from "@/components/reimbursement/Reimburse
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/apiBase";
+import { formatValidationToast, isPlaceholderExpense } from "@/lib/expenseAmount";
 import type { CompanyProfile } from "@/types/company";
 import { Send, Loader2 } from "lucide-react";
 
@@ -81,8 +82,9 @@ export default function ReimbursementForm({
       toast.error("Confirme a revisão final antes de enviar.");
       return;
     }
-    if (!validate()) {
-      toast.error("Preencha todos os campos obrigatórios");
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error(formatValidationToast(validationErrors));
       return;
     }
 
@@ -91,19 +93,23 @@ export default function ReimbursementForm({
       requesterAddress: formData.requesterAddress,
       requesterDocument: formData.requesterDocument,
       requesterEmail: formData.requesterEmail,
-      expenses: formData.expenses.map(({ description, expenseLine, accountCode, amount }) => ({
-        description,
-        expenseLine,
-        accountCode,
-        amount,
-      })),
+      expenses: formData.expenses
+        .filter((e) => !isPlaceholderExpense(e))
+        .map(({ description, expenseLine, accountCode, amount }) => ({
+          description,
+          expenseLine,
+          accountCode,
+          amount,
+        })),
     };
 
     const fd = new FormData();
     fd.append("payload", JSON.stringify(payload));
-    formData.expenses.forEach((e) => {
-      if (e.attachment) fd.append("files", e.attachment);
-    });
+    formData.expenses
+      .filter((e) => !isPlaceholderExpense(e))
+      .forEach((e) => {
+        if (e.attachment) fd.append("files", e.attachment);
+      });
 
     setSubmitting(true);
     try {
@@ -222,19 +228,22 @@ export default function ReimbursementForm({
           }}
         >
           <div
-            className="w-full max-w-5xl max-h-[90vh] bg-background rounded-2xl border border-border shadow-2xl overflow-hidden"
+            className="w-full max-w-5xl max-h-[90vh] bg-background rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 md:px-6 py-4 border-b border-border bg-primary/5">
+            <div className="shrink-0 px-5 md:px-6 py-4 border-b border-border bg-primary/5">
               <h3 className="text-lg font-medium text-foreground">Revisão final do reembolso</h3>
               <p className="text-sm text-muted-foreground font-light mt-0.5">
                 Revise os dados antes de confirmar o envio.
               </p>
             </div>
 
-            <div className="p-5 md:p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6">
               <ReimbursementReviewSection
-                expenses={formData.expenses}
+                expenses={formData.expenses.filter((e) => !isPlaceholderExpense(e))}
+                requesterName={formData.requesterName}
+                requesterEmail={formData.requesterEmail}
+                requesterDocument={formData.requesterDocument}
                 errors={errors}
                 totalAmount={totalAmount}
                 expenseLineOptions={expenseLineOptions}
@@ -242,15 +251,16 @@ export default function ReimbursementForm({
                 onUpdate={updateExpense}
                 onExpenseLineChange={updateExpenseLine}
                 onCnpjConfirmedChange={setExpenseCnpjConfirmed}
+                onRequesterUpdate={updateField}
                 reviewed={reviewConfirmed}
                 onReviewedChange={setReviewConfirmed}
                 className="space-y-5"
-                expensesContainerClassName="space-y-4 max-h-[42vh] overflow-y-auto pr-1"
+                expensesContainerClassName="space-y-4"
               />
             </div>
 
-            <div className="px-5 md:px-6 pt-4 pb-6 md:pb-5 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-              <div className="mt-1 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+            <div className="shrink-0 px-5 md:px-6 py-5 pb-8 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
                 <Button
                   type="button"
                   variant="outline"
