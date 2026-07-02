@@ -71,6 +71,16 @@ function expandCorsOrigins(raw: string): string[] {
 
 const CORS_ALLOWED_ORIGINS = expandCorsOrigins(CLIENT_ORIGIN);
 
+/** Google envia POST do redirect Sign-In com Origin accounts.google.com. */
+const GOOGLE_OAUTH_ORIGINS = new Set(["https://accounts.google.com"]);
+
+function isCorsOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (CORS_ALLOWED_ORIGINS.includes(origin)) return true;
+  if (GOOGLE_OAUTH_ORIGINS.has(origin)) return true;
+  return false;
+}
+
 /** Primeira origem do front (redirect pós-login Google). */
 const PRIMARY_CLIENT_ORIGIN =
   CLIENT_ORIGIN.split(",")
@@ -115,15 +125,13 @@ async function verifyGoogleCredential(credential: string): Promise<SessionUser> 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) {
+      if (isCorsOriginAllowed(origin)) {
         callback(null, true);
         return;
       }
-      if (CORS_ALLOWED_ORIGINS.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      console.warn(`[cors] origem bloqueada: ${origin} (permitidas: ${CORS_ALLOWED_ORIGINS.join(", ")})`);
+      console.warn(
+        `[cors] origem bloqueada: ${origin} (permitidas: ${CORS_ALLOWED_ORIGINS.join(", ")})`
+      );
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
