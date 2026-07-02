@@ -122,21 +122,34 @@ async function verifyGoogleCredential(credential: string): Promise<SessionUser> 
   };
 }
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (isCorsOriginAllowed(origin)) {
-        callback(null, true);
-        return;
-      }
-      console.warn(
-        `[cors] origem bloqueada: ${origin} (permitidas: ${CORS_ALLOWED_ORIGINS.join(", ")})`
-      );
-      callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
+/** Google redirect POST não deve ser bloqueado por CORS (navegação, não fetch SPA). */
+function shouldSkipCors(req: express.Request): boolean {
+  if (req.path === "/api/auth/google/callback") return true;
+  if (req.path === "/api/auth/google" && req.method === "POST") return true;
+  return false;
+}
+
+const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    if (isCorsOriginAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+    console.warn(
+      `[cors] origem bloqueada: ${origin} (permitidas: ${CORS_ALLOWED_ORIGINS.join(", ")})`
+    );
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+});
+
+app.use((req, res, next) => {
+  if (shouldSkipCors(req)) {
+    next();
+    return;
+  }
+  corsMiddleware(req, res, next);
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
@@ -282,10 +295,17 @@ app.put("/api/admin/company", requireAuth, requireAdmin, async (req, res) => {
 
 app.post("/api/auth/google", async (req, res) => {
   if (!googleClient || !GOOGLE_CLIENT_ID) {
-    return res.status(503).json({ error: "Login Google não configurado (GOOGLE_CLIENT_ID)" });
+    if (req.is("application/json")) {
+      return res.status(503).json({ error: "Login Google não configurado (GOOGLE_CLIENT_ID)" });
+    }
+    return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=google_not_configured`);
   }
   const credential = req.body?.credential as string | undefined;
+  const redirectFlow = !req.is("application/json");
   if (!credential) {
+    if (redirectFlow) {
+      return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=missing_credential`);
+    }
     return res.status(400).json({ error: "Credencial ausente" });
   }
   try {
@@ -294,13 +314,22 @@ app.post("/api/auth/google", async (req, res) => {
     req.session.save((saveErr) => {
       if (saveErr) {
         console.error("[auth/google] session.save:", saveErr);
+        if (redirectFlow) {
+          return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=session`);
+        }
         return res.status(500).json({ error: "Não foi possível iniciar a sessão" });
+      }
+      if (redirectFlow) {
+        return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/`);
       }
       res.json(req.session.user);
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[auth/google] verifyIdToken:", msg);
+    if (redirectFlow) {
+      return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=invalid_token`);
+    }
     const audienceMismatch = /audience|Audience|recipient/i.test(msg);
     const hint = audienceMismatch
       ? "No .env, GOOGLE_CLIENT_ID (servidor) deve ser exatamente igual a VITE_GOOGLE_CLIENT_ID (front). Use o mesmo ID do cliente OAuth (tipo Aplicativo da Web) no Google Cloud."
