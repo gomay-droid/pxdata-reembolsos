@@ -57,6 +57,7 @@ type AdminReimbursementDetails = {
     expenseLine: string;
     accountCode?: string | null;
     amount: number;
+    observation?: string | null;
     attachments?: Array<{
       id: number;
       originalName: string;
@@ -271,7 +272,7 @@ export default function AdminPage() {
 
   if (loading || adminLoading || isAdmin === null) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+      <div className="min-h-dvh bg-background flex items-center justify-center text-muted-foreground">
         <Loader2 className="h-10 w-10 animate-spin" />
       </div>
     );
@@ -279,7 +280,7 @@ export default function AdminPage() {
 
   if (!user || !isAdmin) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12 text-center">
+      <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-4 py-12 text-center">
         <div className="max-w-md w-full space-y-6 rounded-2xl border border-border bg-card p-6 md:p-8">
           <div className="flex items-center justify-center gap-3">
             <Shield className="h-5 w-5 text-destructive" />
@@ -303,7 +304,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -508,6 +509,12 @@ export default function AdminPage() {
                               {e.expenseLine}
                               {e.accountCode ? ` · ${e.accountCode}` : ""}
                             </p>
+                            {e.observation?.trim() && (
+                              <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">
+                                <span className="font-medium text-foreground/80">Observação: </span>
+                                {e.observation.trim()}
+                              </p>
+                            )}
                           </div>
                           <div className="text-sm text-foreground shrink-0 sm:text-right tabular-nums">
                             R$ {e.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}

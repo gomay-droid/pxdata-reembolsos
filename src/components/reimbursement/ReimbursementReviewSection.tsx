@@ -216,6 +216,17 @@ export function ReimbursementReviewSection({
                   className="h-11 bg-card border-border font-light"
                 />
               </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-sm text-muted-foreground">Observação (opcional)</Label>
+                <textarea
+                  value={expense.observation ?? ""}
+                  onChange={(e) => onUpdate(expense.id, "observation", e.target.value)}
+                  placeholder="Informações adicionais sobre esta despesa…"
+                  rows={3}
+                  className="flex w-full rounded-2xl border border-input bg-card px-4 py-3 font-light ring-offset-background placeholder:text-muted-foreground transition-colors duration-300 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-foreground/25 resize-y min-h-[5rem]"
+                />
+              </div>
             </div>
             {errors[`expense_${expense.id}_attachment`] && (
               <p className="text-xs text-destructive">{errors[`expense_${expense.id}_attachment`]}</p>

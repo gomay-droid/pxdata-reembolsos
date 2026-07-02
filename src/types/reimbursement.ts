@@ -15,6 +15,8 @@ export interface Expense {
   supplierCnpjConfirmed?: boolean;
   /** Comprovante exclusivo desta linha (enviado no FormData na mesma ordem das despesas). */
   attachment: File | null;
+  /** Informações adicionais sobre a despesa (opcional). */
+  observation?: string;
   /** Presente quando o item veio do upload em massa ou anexo único com pipeline de extração. */
   receiptProcessingStatus?: ExpenseReceiptProcessingStatus;
   /** Mensagem amigável quando status é erro. */

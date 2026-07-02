@@ -62,6 +62,7 @@ function buildBulkAppend(
     amountUsd: "",
     supplierCnpj: "",
     supplierCnpjConfirmed: false,
+    observation: "",
     attachment: file,
     receiptProcessingStatus: "processing",
   }));
@@ -80,6 +81,7 @@ const createEmptyExpense = (id: number): Expense => ({
   amountUsd: "",
   supplierCnpj: "",
   supplierCnpjConfirmed: false,
+  observation: "",
   attachment: null,
 });
 

@@ -95,11 +95,12 @@ export default function ReimbursementForm({
       requesterEmail: formData.requesterEmail,
       expenses: formData.expenses
         .filter((e) => !isPlaceholderExpense(e))
-        .map(({ description, expenseLine, accountCode, amount }) => ({
+        .map(({ description, expenseLine, accountCode, amount, observation }) => ({
           description,
           expenseLine,
           accountCode,
           amount,
+          observation,
         })),
     };
 
@@ -228,7 +229,7 @@ export default function ReimbursementForm({
           }}
         >
           <div
-            className="w-full max-w-5xl max-h-[90vh] bg-background rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col"
+            className="w-full max-w-5xl max-h-[90dvh] bg-background rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="shrink-0 px-5 md:px-6 py-4 border-b border-border bg-primary/5">
@@ -259,7 +260,7 @@ export default function ReimbursementForm({
               />
             </div>
 
-            <div className="shrink-0 px-5 md:px-6 py-5 pb-8 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+            <div className="shrink-0 px-5 md:px-6 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
                 <Button
                   type="button"

@@ -97,7 +97,7 @@ export function ReceiptBulkUpload({ onFiles, disabled }: Props) {
         </div>
         <div className="space-y-1 max-w-md">
           <p className="text-base font-medium text-foreground">
-            Arraste comprovantes aqui ou clique para escolher
+            Toque para escolher ou arraste comprovantes aqui
           </p>
           <p className="text-sm text-muted-foreground font-light leading-relaxed">
             Cada arquivo vira uma despesa. Formatos: PDF, JPG ou PNG · até 15 MB por arquivo · vários
