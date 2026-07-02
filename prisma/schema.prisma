@@ -39,6 +39,7 @@ model Expense {
   expenseLine     String
   accountCode     String?
   amount          Float
+  observation     String?
   attachments     Attachment[]
 }
 

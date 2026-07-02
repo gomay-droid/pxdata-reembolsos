@@ -21,13 +21,13 @@ export function DescriptionCombobox({ inputId, value, onChange, error }: Props) 
   }, [value]);
 
   useEffect(() => {
-    const onDocMouseDown = (e: MouseEvent) => {
+    const onDocPointerDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => document.removeEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("pointerdown", onDocPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown);
   }, []);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export function DescriptionCombobox({ inputId, value, onChange, error }: Props) 
               <button
                 type="button"
                 className="w-full rounded-lg px-3 py-2 text-left text-sm font-light hover:bg-accent hover:text-accent-foreground"
-                onMouseDown={(e) => e.preventDefault()}
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onChange(opt);
                   setOpen(false);

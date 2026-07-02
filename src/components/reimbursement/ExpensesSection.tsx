@@ -401,6 +401,17 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2 md:col-span-2">
+                          <Label className="text-sm text-muted-foreground">Observação (opcional)</Label>
+                          <textarea
+                            value={expense.observation ?? ""}
+                            onChange={(e) => onUpdate(expense.id, "observation", e.target.value)}
+                            placeholder="Informações adicionais sobre esta despesa…"
+                            rows={3}
+                            className="flex w-full rounded-2xl border border-input bg-secondary px-4 py-3 font-light ring-offset-background placeholder:text-muted-foreground transition-colors duration-300 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-foreground/25 disabled:cursor-not-allowed disabled:opacity-50 resize-y min-h-[5rem]"
+                          />
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2">
                           <Label className="text-sm text-muted-foreground">Comprovante desta despesa *</Label>
                           <p className="text-xs text-muted-foreground">
                             O sistema tenta preencher descrição, classificação, CNPJ e valores automaticamente

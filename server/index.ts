@@ -281,7 +281,13 @@ app.post("/api/auth/logout", (req, res) => {
     if (err) {
       return res.status(500).json({ error: "Erro ao encerrar sessão" });
     }
-    res.clearCookie("reembolso.sid", { path: "/" });
+    res.clearCookie("reembolso.sid", {
+      path: "/",
+      httpOnly: true,
+      sameSite:
+        process.env.NODE_ENV === "production" && TRUST_CROSS_SITE_SESSION ? "none" : "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
     res.status(204).end();
   });
 });
@@ -335,6 +341,7 @@ type PayloadExpense = {
   expenseLine: string;
   accountCode?: string;
   amount: string | number;
+  observation?: string;
 };
 
 type PayloadBody = {
@@ -436,6 +443,7 @@ app.post(
               accountCode: e.accountCode?.trim() || null,
               amount:
                 typeof e.amount === "string" ? parseFloat(e.amount) : Number(e.amount),
+              observation: e.observation?.trim() || null,
             })),
           },
         },

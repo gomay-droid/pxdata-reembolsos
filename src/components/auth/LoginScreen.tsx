@@ -11,7 +11,7 @@ interface Props {
 
 export function LoginScreen({ onLoggedIn, configError }: Props) {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-4 py-12 pb-[max(3rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-md space-y-8 text-center">
         <div className="flex justify-center">
           <BrandLogoMark size="lg" />
@@ -33,6 +33,7 @@ export function LoginScreen({ onLoggedIn, configError }: Props) {
               <Building2 className="h-4 w-4" />
               Acesso restrito
             </div>
+            <div className="w-full flex justify-center overflow-visible">
             <GoogleLogin
               onSuccess={async (credentialResponse) => {
                 const credential = credentialResponse.credential;
@@ -75,7 +76,9 @@ export function LoginScreen({ onLoggedIn, configError }: Props) {
               text="continue_with"
               shape="pill"
               locale="pt-BR"
+              width={280}
             />
+            </div>
           </div>
         )}
       </div>

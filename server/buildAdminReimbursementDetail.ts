@@ -24,6 +24,7 @@ export type AdminExpenseRowJson = {
   expenseLine: string;
   accountCode: string | null;
   amount: number;
+  observation: string | null;
   attachments: AdminExpenseAttachmentJson[];
 };
 
@@ -66,6 +67,7 @@ export function buildAdminExpenseRowsForJson(
     expenseLine: e.expenseLine,
     accountCode: e.accountCode,
     amount: e.amount,
+    observation: e.observation,
     attachments: (linkedByExpenseId.get(e.id) ?? []).map(toJson),
   }));
 
