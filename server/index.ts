@@ -71,12 +71,45 @@ function expandCorsOrigins(raw: string): string[] {
 
 const CORS_ALLOWED_ORIGINS = expandCorsOrigins(CLIENT_ORIGIN);
 
+/** Primeira origem do front (redirect pós-login Google). */
+const PRIMARY_CLIENT_ORIGIN =
+  CLIENT_ORIGIN.split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .find(Boolean) ?? "http://localhost:5173";
+
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 if (GOOGLE_CLIENT_ID) {
   console.log("[auth] Google OAuth: GOOGLE_CLIENT_ID carregado no servidor.");
 } else {
   console.warn("[auth] GOOGLE_CLIENT_ID ausente — login Google retornará 503.");
+}
+
+type SessionUser = {
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+};
+
+async function verifyGoogleCredential(credential: string): Promise<SessionUser> {
+  if (!googleClient || !GOOGLE_CLIENT_ID) {
+    throw new Error("Login Google não configurado");
+  }
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: GOOGLE_CLIENT_ID,
+  });
+  const payload = ticket.getPayload();
+  if (!payload?.sub || !payload.email) {
+    throw new Error("Token Google inválido");
+  }
+  return {
+    sub: payload.sub,
+    email: payload.email,
+    name: payload.name,
+    picture: payload.picture,
+  };
 }
 
 app.use(
@@ -97,6 +130,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
     name: "reembolso.sid",
@@ -247,21 +281,15 @@ app.post("/api/auth/google", async (req, res) => {
     return res.status(400).json({ error: "Credencial ausente" });
   }
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: GOOGLE_CLIENT_ID,
+    const user = await verifyGoogleCredential(credential);
+    req.session.user = user;
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error("[auth/google] session.save:", saveErr);
+        return res.status(500).json({ error: "Não foi possível iniciar a sessão" });
+      }
+      res.json(req.session.user);
     });
-    const payload = ticket.getPayload();
-    if (!payload?.sub || !payload.email) {
-      return res.status(401).json({ error: "Token Google inválido" });
-    }
-    req.session.user = {
-      sub: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      picture: payload.picture,
-    };
-    res.json(req.session.user);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[auth/google] verifyIdToken:", msg);
@@ -273,6 +301,31 @@ app.post("/api/auth/google", async (req, res) => {
       error: "Não foi possível validar o login Google.",
       hint,
     });
+  }
+});
+
+/** Redirect UX do Google (mobile): recebe POST do GIS e redireciona ao front com sessão. */
+app.post("/api/auth/google/callback", async (req, res) => {
+  if (!googleClient || !GOOGLE_CLIENT_ID) {
+    return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=google_not_configured`);
+  }
+  const credential = req.body?.credential as string | undefined;
+  if (!credential) {
+    return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=missing_credential`);
+  }
+  try {
+    const user = await verifyGoogleCredential(credential);
+    req.session.user = user;
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error("[auth/google/callback] session.save:", saveErr);
+        return res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=session`);
+      }
+      res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/`);
+    });
+  } catch (e) {
+    console.error("[auth/google/callback]", e);
+    res.redirect(302, `${PRIMARY_CLIENT_ORIGIN}/?auth_error=invalid_token`);
   }
 });
 

@@ -60,6 +60,19 @@ const Index = () => {
   }, [refresh]);
 
   useEffect(() => {
+    const authError = searchParams.get("auth_error");
+    if (!authError) return;
+    const messages: Record<string, string> = {
+      missing_credential: "Login Google não retornou credencial. Tente novamente.",
+      invalid_token: "Não foi possível validar o login Google.",
+      session: "Não foi possível manter a sessão após o login.",
+      google_not_configured: "Login Google não configurado no servidor.",
+    };
+    toast.error(messages[authError] ?? "Falha no login. Tente novamente.");
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (user && view === "list") {
       void loadReimbursements();
     }

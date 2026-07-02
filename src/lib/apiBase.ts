@@ -22,20 +22,22 @@ function normalizeBase(raw: string | undefined): string {
 
 const BASE = normalizeBase(import.meta.env.VITE_API_BASE_URL as string | undefined);
 
-/** Em produção, sem base a API cai em /api no domínio da Vercel → 405 (SPA rewrite). */
+/** Em produção no browser usamos `/api` same-origin (proxy Vercel). BASE direto é opcional. */
 export function productionApiBaseMissingMessage(): string | null {
-  if (!import.meta.env.PROD || BASE) return null;
-  return (
-    "Em produção falta VITE_API_BASE_URL na Vercel (Settings → Environment Variables): " +
-    "coloque a URL HTTPS da API no Railway (ex.: https://seu-app.up.railway.app), sem barra no final, " +
-    "marque Production e faça Redeploy. Sem isso o login quebra com erro 405."
-  );
+  return null;
 }
 
+/**
+ * Em produção no browser, prefira `/api` no mesmo domínio (Vercel faz proxy → Railway).
+ * Cookies de sessão só persistem de forma confiável no mobile quando a API é same-origin.
+ */
 export function apiUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
   if (!path.startsWith("/")) {
     throw new Error(`apiUrl: use path absoluto (ex.: /api/...), recebido: ${path}`);
+  }
+  if (import.meta.env.PROD && typeof window !== "undefined") {
+    return path;
   }
   return BASE ? `${BASE}${path}` : path;
 }
