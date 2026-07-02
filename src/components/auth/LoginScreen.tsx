@@ -2,7 +2,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogoMark } from "@/components/BrandLogoMark";
-import { apiUrl } from "@/lib/apiBase";
+import { apiUrl, googleAuthCallbackUrl } from "@/lib/apiBase";
 import { isMobileBrowser } from "@/lib/isMobileBrowser";
 
 interface Props {
@@ -12,10 +12,7 @@ interface Props {
 
 export function LoginScreen({ onLoggedIn, configError }: Props) {
   const useRedirect = isMobileBrowser();
-  const loginUri =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/api/auth/google/callback`
-      : undefined;
+  const loginUri = googleAuthCallbackUrl();
 
   return (
     <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-4 py-12 pb-[max(3rem,env(safe-area-inset-bottom))]">
