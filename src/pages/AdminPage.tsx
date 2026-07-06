@@ -22,6 +22,7 @@ import {
   MessageSquareWarning,
   Sheet,
   Shield,
+  Trash2,
   X,
   XCircle,
 } from "lucide-react";
@@ -105,6 +106,16 @@ export default function AdminPage() {
   const statusPatchLockRef = useRef(false);
   const [patchingDecision, setPatchingDecision] = useState<AdminReimbursementDecision | null>(null);
   const [downloadingSpreadsheet, setDownloadingSpreadsheet] = useState(false);
+  const [expensePendingDelete, setExpensePendingDelete] = useState<{
+    id: number;
+    description: string;
+    amount: number;
+  } | null>(null);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<number | null>(null);
+  const [reimbursementPendingDelete, setReimbursementPendingDelete] = useState<Reimbursement | null>(
+    null
+  );
+  const [deletingReimbursementId, setDeletingReimbursementId] = useState<string | null>(null);
 
   const submitAdminDecision = useCallback(
     async (decision: AdminReimbursementDecision) => {
@@ -146,8 +157,48 @@ export default function AdminPage() {
 
   const closeDetails = useCallback(() => {
     setExpenseEmailModal(null);
+    setExpensePendingDelete(null);
     setSelected(null);
   }, []);
+
+  const confirmDeleteExpense = useCallback(async () => {
+    if (!selected || !expensePendingDelete || deletingExpenseId !== null) return;
+    const { id: expenseId } = expensePendingDelete;
+    const reimbursementId = selected.id;
+    setDeletingExpenseId(expenseId);
+    try {
+      const res = await fetch(
+        apiUrl(
+          `/api/admin/reimbursements/${encodeURIComponent(reimbursementId)}/expenses/${expenseId}`
+        ),
+        { method: "DELETE", credentials: "include" }
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        totalAmount?: number;
+      };
+      if (!res.ok) {
+        toast.error(data.error ?? "Não foi possível excluir a despesa");
+        return;
+      }
+      const newTotal = data.totalAmount ?? 0;
+      setSelected((prev) => {
+        if (!prev || prev.id !== reimbursementId) return prev;
+        return {
+          ...prev,
+          totalAmount: newTotal,
+          expenses: prev.expenses.filter((e) => e.id !== expenseId),
+        };
+      });
+      setReimbursements((prev) =>
+        prev.map((r) => (r.id === reimbursementId ? { ...r, totalAmount: newTotal } : r))
+      );
+      setExpensePendingDelete(null);
+      toast.success("Despesa excluída com sucesso.");
+    } finally {
+      setDeletingExpenseId(null);
+    }
+  }, [selected, expensePendingDelete, deletingExpenseId]);
 
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
@@ -247,6 +298,43 @@ export default function AdminPage() {
       setMetricsLoaded(true);
     }
   }, []);
+
+  const requestDeleteReimbursement = useCallback((r: Reimbursement) => {
+    setReimbursementPendingDelete(r);
+  }, []);
+
+  const confirmDeleteReimbursement = useCallback(async () => {
+    if (!reimbursementPendingDelete || deletingReimbursementId !== null) return;
+    const deletedId = reimbursementPendingDelete.id;
+    setDeletingReimbursementId(deletedId);
+    try {
+      const res = await fetch(
+        apiUrl(`/api/admin/reimbursements/${encodeURIComponent(deletedId)}`),
+        { method: "DELETE", credentials: "include" }
+      );
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        toast.error(data.error ?? "Não foi possível excluir o reembolso");
+        return;
+      }
+      setReimbursements((prev) => prev.filter((r) => r.id !== deletedId));
+      if (selected?.id === deletedId) {
+        closeDetails();
+      }
+      setReimbursementPendingDelete(null);
+      setMetricsLoaded(false);
+      void loadMetrics();
+      toast.success("Reembolso excluído com sucesso.");
+    } finally {
+      setDeletingReimbursementId(null);
+    }
+  }, [
+    reimbursementPendingDelete,
+    deletingReimbursementId,
+    selected,
+    closeDetails,
+    loadMetrics,
+  ]);
 
   useEffect(() => {
     if (user) {
@@ -386,7 +474,12 @@ export default function AdminPage() {
                 <Loader2 className="h-8 w-8 animate-spin" />
               </div>
             ) : (
-              <ReimbursementList reimbursements={reimbursements} onSelect={openDetails} />
+              <ReimbursementList
+                reimbursements={reimbursements}
+                onSelect={openDetails}
+                onDeleteRequest={isAdmin ? requestDeleteReimbursement : undefined}
+                deletingReimbursementId={deletingReimbursementId}
+              />
             )}
           </section>
         )}
@@ -398,6 +491,8 @@ export default function AdminPage() {
               reimbursements={reimbursements}
               metricsLoaded={metricsLoaded}
               onOpenReimbursement={openDetails}
+              onDeleteReimbursement={isAdmin ? requestDeleteReimbursement : undefined}
+              deletingReimbursementId={deletingReimbursementId}
             />
           </section>
         )}
@@ -599,7 +694,7 @@ export default function AdminPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={patchingDecision !== null}
+                            disabled={patchingDecision !== null || deletingExpenseId !== null}
                             className="gap-1.5 border-border/80 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                             onClick={() =>
                               setExpenseEmailModal({
@@ -611,6 +706,33 @@ export default function AdminPage() {
                             <Mail className="h-3.5 w-3.5" />
                             Notificar por e-mail
                           </Button>
+                          {isAdmin && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                patchingDecision !== null ||
+                                deletingExpenseId !== null ||
+                                expensePendingDelete !== null
+                              }
+                              className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                              onClick={() =>
+                                setExpensePendingDelete({
+                                  id: e.id,
+                                  description: e.description,
+                                  amount: e.amount,
+                                })
+                              }
+                            >
+                              {deletingExpenseId === e.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                              Excluir
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -634,6 +756,125 @@ export default function AdminPage() {
           collaboratorEmail={selected.requesterEmail}
           expenseDescription={expenseEmailModal.expenseDescription}
         />
+      )}
+
+      {selected && expensePendingDelete && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onMouseDown={() => {
+            if (deletingExpenseId === null) setExpensePendingDelete(null);
+          }}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-expense-title"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card shadow-refined-lg p-6 space-y-4"
+            onMouseDown={(ev) => ev.stopPropagation()}
+          >
+            <div>
+              <h3 id="delete-expense-title" className="text-lg font-medium text-foreground">
+                Excluir despesa
+              </h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                Tem certeza que deseja excluir esta despesa permanentemente?
+              </p>
+              <p className="text-sm text-foreground mt-3 font-medium truncate">
+                {expensePendingDelete.description}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+                R${" "}
+                {expensePendingDelete.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deletingExpenseId !== null}
+                onClick={() => setExpensePendingDelete(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deletingExpenseId !== null}
+                className="gap-1.5"
+                onClick={() => void confirmDeleteExpense()}
+              >
+                {deletingExpenseId !== null ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Excluir permanentemente
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reimbursementPendingDelete && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onMouseDown={() => {
+            if (deletingReimbursementId === null) setReimbursementPendingDelete(null);
+          }}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-reimbursement-title"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card shadow-refined-lg p-6 space-y-4"
+            onMouseDown={(ev) => ev.stopPropagation()}
+          >
+            <div>
+              <h3 id="delete-reimbursement-title" className="text-lg font-medium text-foreground">
+                Excluir reembolso
+              </h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                Tem certeza que deseja excluir esta despesa inteira? Esta ação não poderá ser
+                desfeita.
+              </p>
+              <p className="text-sm text-foreground mt-3 font-medium truncate">
+                {reimbursementPendingDelete.id} · {reimbursementPendingDelete.requesterName}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+                R${" "}
+                {reimbursementPendingDelete.totalAmount.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
+                {" · "}
+                {formatReimbursementDate(reimbursementPendingDelete.createdAt)}
+              </p>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deletingReimbursementId !== null}
+                onClick={() => setReimbursementPendingDelete(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deletingReimbursementId !== null}
+                className="gap-1.5"
+                onClick={() => void confirmDeleteReimbursement()}
+              >
+                {deletingReimbursementId !== null ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Excluir permanentemente
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {loadingSelected && (

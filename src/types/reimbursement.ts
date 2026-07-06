@@ -13,8 +13,8 @@ export interface Expense {
   supplierCnpj?: string;
   /** Permite confirmar ausência de CNPJ quando não consta na nota. */
   supplierCnpjConfirmed?: boolean;
-  /** Comprovante exclusivo desta linha (enviado no FormData na mesma ordem das despesas). */
-  attachment: File | null;
+  /** Comprovantes desta linha (enviados no FormData na ordem das despesas). */
+  attachments: File[];
   /** Informações adicionais sobre a despesa (opcional). */
   observation?: string;
   /** Presente quando o item veio do upload em massa ou anexo único com pipeline de extração. */

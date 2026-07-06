@@ -1,250 +1,233 @@
 # Documentação técnica — PX Data Reembolsos
 
-Documento para **desenvolvedores e operações**: arquitetura, configuração, API, dados e convenções do repositório.
+Documento para **desenvolvedores e operações**: arquitetura, configuração, API, dados e deploy.
 
-**Relacionado:** [Documentação de produto](./DOCUMENTACAO_PRODUTO.md) · [Deploy Vercel (front)](./DEPLOY_VERCEL.md) · [Deploy da API (Docker / Railway)](./DEPLOY_API.md)
+**Relacionado:** [Documentação de produto](./DOCUMENTACAO_PRODUTO.md) · [Deploy Vercel](./DEPLOY_VERCEL.md) · [Deploy API](./DEPLOY_API.md)
 
 ---
 
-## 1. Arquitetura
+## 1. Arquitetura de produção
 
 ```mermaid
 flowchart LR
-  subgraph client [Navegador]
-    Vite[Vite + React]
+  subgraph browser [Navegador]
+    SPA[React SPA]
   end
-  subgraph dev [Desenvolvimento]
-    Vite -->|proxy /api e /uploads| API
+  subgraph vercel [Vercel]
+    SPA
+    Proxy["/api e /uploads → proxy"]
   end
-  subgraph server [Node.js]
-    API[Express + express-session]
-    API --> Prisma[Prisma ORM]
+  subgraph railway [Railway]
+    API[Express + session]
+    API --> Prisma[Prisma]
     Prisma --> DB[(SQLite dev.db)]
     API --> FS[uploads/]
   end
-  client -->|credenciais cookie| Vite
+  SPA --> Proxy
+  Proxy --> API
 ```
 
-- **Front-end:** React 18, TypeScript, Vite 6, Tailwind CSS, componentes estilo shadcn (Radix), React Router 7, Sonner.
-- **Back-end:** um único processo Express (`server/index.ts`), executado com `tsx` (TypeScript no Node, ESM).
-- **Persistência:** SQLite via Prisma; arquivos em disco sob `uploads/` (relativo à raiz do projeto).
-- **Desenvolvimento:** `npm run dev` sobe API (porta **3001**) e Vite (**5173**); o Vite **proxy** encaminha `/api` e `/uploads` para a API (cookies e uploads funcionam no mesmo host do browser).
-- **Produção (Vercel + API separada):** o front usa `VITE_API_BASE_URL` e o helper `src/lib/apiBase.ts` (`apiUrl` / `assetUrl`). Na API, `TRUST_CROSS_SITE_SESSION=1` e `CLIENT_ORIGIN` com a URL do front. Ver [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md).
+| Camada | Tecnologia | URL produção |
+|--------|------------|--------------|
+| Front | React 18, Vite 6, Tailwind, Radix UI | https://pxdata-reembolsos.vercel.app |
+| API | Express, express-session, Multer, Prisma | https://pxdata-reembolsos-production.up.railway.app |
+| Banco | SQLite (`prisma/dev.db`) | Volume persistente no Railway |
+| Arquivos | Disco `uploads/` | Volume persistente no Railway |
+
+**Proxy Vercel:** `vercel.json` encaminha `/api/*` e `/uploads/*` para a Railway. No browser, `apiUrl()` usa paths relativos (`/api/...`) em produção — cookies de sessão ficam no domínio da Vercel (same-origin), essencial para mobile.
+
+**Desenvolvimento:** `npm run dev` — Vite `:5173` + API `:3001`; proxy local em `vite.config.ts`.
 
 ---
 
-## 2. Estrutura de pastas (relevante)
+## 2. Stack e estrutura
 
 | Caminho | Conteúdo |
 |---------|----------|
-| `src/` | Aplicação React (`main.tsx`, `App.tsx`, páginas, componentes, hooks, `lib/`, `types/`) |
-| `src/components/ui/` | Primitivos de UI (Button, Input, Select, etc.) |
-| `src/components/reimbursement/` | Formulário e listas de reembolso |
-| `src/components/admin/` | Painel admin, dashboard, empresa, modal de e-mail |
-| `server/index.ts` | Rotas HTTP, auth, multer, estáticos |
-| `server/buildAdminReimbursementDetail.ts` | Montagem do JSON de despesas + anexos (incl. legado sem `expenseId`) |
-| `server/extractLab.ts` | Extração de texto / hints para o lab |
-| `server/session.d.ts` | Extensão de tipos `express-session` |
-| `prisma/schema.prisma` | Modelos e URL do SQLite |
-| `prisma/migrations/` | Migrações versionadas |
-| `uploads/` | Comprovantes persistidos (gitignored em produção típica) |
-| `docs/` | Documentação de produto e técnica |
+| `src/` | SPA React (páginas, componentes, hooks, `lib/`, `types/`) |
+| `server/index.ts` | API Express (auth, reembolsos, admin, uploads) |
+| `server/buildAdminReimbursementDetail.ts` | JSON admin com anexos por despesa |
+| `server/exportExpenseSpreadsheet.ts` | Export Excel (Nota Débito) |
+| `server/extractLab.ts` | OCR/extração de comprovantes |
+| `prisma/schema.prisma` | Modelos SQLite |
+| `vercel.json` | Rewrites: proxy API + SPA fallback |
+| `Dockerfile` | Imagem só da API (Railway) |
 
-**Alias TypeScript / Vite:** `@/*` → `src/*` (ver `tsconfig.json` e `vite.config.ts`).
+**Scripts principais:** `npm run dev`, `npm run build`, `npm start` (migrate + API).
 
 ---
 
-## 3. Requisitos e scripts
+## 3. Variáveis de ambiente
 
-- **Node.js** compatível com as dependências do `package.json` (recomendado LTS atual).
-- **npm** (ou pnpm/yarn, não documentado aqui).
+### Railway (API)
 
-| Script | Descrição |
-|--------|-----------|
-| `npm run dev` | API (`tsx watch server/index.ts`) + Vite em paralelo (`concurrently`) |
-| `npm run dev:client` | Somente Vite |
-| `npm run dev:server` | Somente API |
-| `npm run build` | Build de produção do front (`dist/`) |
-| `npm run preview` | Servir `dist/` (sem proxy; para API completa use deploy com proxy reverso) |
-| `npm run db:generate` | `prisma generate` |
-| `npm run db:migrate` | `prisma migrate dev` |
-| `npm run db:push` | `prisma db push` (sem histórico de migração) |
+| Variável | Exemplo / uso |
+|----------|----------------|
+| `GOOGLE_CLIENT_ID` | Mesmo ID do cliente OAuth Web |
+| `SESSION_SECRET` | String longa aleatória |
+| `CLIENT_ORIGIN` | `https://pxdata-reembolsos.vercel.app` (vírgula se múltiplas origens) |
+| `ADMIN_EMAILS` | E-mails admin separados por vírgula |
+| `TRUST_CROSS_SITE_SESSION` | `1` |
+| `NODE_ENV` | `production` |
+| `PORT` | Injetado pelo Railway |
 
-**Typecheck:** `tsconfig.json` inclui apenas `src/`; o servidor não é emitido pelo `tsc` do projeto — validação ocorre via `tsx` em runtime. Opcional: `npx tsc --noEmit` pode reportar avisos se estender o `include`.
+**Exemplo `ADMIN_EMAILS` (repositório / `.env.example`):**
 
----
+```
+financeiro@pxdata.ai,mayco@pxdata.ai,bpofinanceiro@glip.com.br
+```
 
-## 4. Variáveis de ambiente
+A lista efetiva em produção é **somente** a variável no Railway — alterações no código ou `.env.example` não concedem admin até atualizar o Railway e redeploy.
 
-Arquivo na **raiz**: `.env` (modelo em `.env.example`). Principais chaves:
+### Vercel (front)
 
-| Variável | Onde lê | Uso |
-|----------|---------|-----|
-| `GOOGLE_CLIENT_ID` | Servidor | Validação do token JWT do Google (`google-auth-library`) |
-| `VITE_GOOGLE_CLIENT_ID` | Front (build-time) | `GoogleOAuthProvider` / `GoogleLogin` — **deve ser igual** a `GOOGLE_CLIENT_ID` |
-| `SESSION_SECRET` | Servidor | Assinatura do cookie de sessão |
-| `CLIENT_ORIGIN` | Servidor | CORS + alinhamento com origem do front (pode ser lista separada por vírgula) |
-| `ADMIN_EMAILS` | Servidor | E-mails permitidos no painel admin (separados por vírgula) |
-| `PORT` | Servidor | Porta da API (padrão **3001**) |
-| `NODE_ENV` | Servidor | `production` ativa `cookie.secure` na sessão |
-| `VITE_API_BASE_URL` | Build do front | URL da API sem barra final; vazio em dev (proxy Vite) |
-| `TRUST_CROSS_SITE_SESSION` | Servidor | `1` ou `true` se front e API forem domínios diferentes (cookie `SameSite=None`) |
+| Variável | Uso |
+|----------|-----|
+| `VITE_GOOGLE_CLIENT_ID` | Igual a `GOOGLE_CLIENT_ID` |
+| `VITE_API_BASE_URL` | Opcional em prod (browser usa `/api` relativo via proxy) |
 
-**CORS:** `expandCorsOrigins` duplica `localhost` ↔ `127.0.0.1` para a mesma porta, evitando bloqueio quando o `.env` usa só uma forma.
+### Google Cloud Console
 
----
+**Origens JavaScript autorizadas:**
 
-## 5. Autenticação e sessão
+- `http://localhost:5173`
+- `https://pxdata-reembolsos.vercel.app`
 
-1. Front obtém **credential JWT** do Google (`@react-oauth/google`).
-2. `POST /api/auth/google` envia `{ credential }`; servidor valida com `OAuth2Client.verifyIdToken`.
-3. Em sucesso, grava `req.session.user` com `sub`, `email`, `name`, `picture`.
-4. Demais rotas protegidas usam middleware `requireAuth` (presença de `sub`).
-5. Admin: `requireAdmin` exige `ADMIN_EMAILS` não vazio e `email` da sessão na lista (comparação exata após trim na lista).
+**URIs de redirecionamento autorizados (login mobile):**
 
-**Cookie:** nome `reembolso.sid`, `httpOnly`, `sameSite: lax`, 7 dias, `secure` em produção.
-
-**Logout:** `POST /api/auth/logout` destrói sessão e limpa cookie.
+- `https://pxdata-reembolsos.vercel.app/api/auth/google/callback`
+- `https://pxdata-reembolsos-production.up.railway.app/api/auth/google/callback`
 
 ---
 
-## 6. API HTTP — referência resumida
+## 4. Autenticação
 
-Base URL em dev (via proxy): **`/api`**. Respostas de erro costumam ser JSON `{ error: string }`.
+### Fluxo desktop (popup)
 
-### Autenticação / sessão
+1. `GoogleLogin` retorna JWT (`credential`)
+2. `POST /api/auth/google` com JSON `{ credential }`
+3. Servidor valida com `google-auth-library`
+4. `req.session.save()` → cookie `reembolso.sid`
 
-| Método | Rota | Auth | Descrição |
-|--------|------|------|-----------|
-| `GET` | `/api/auth/me` | Não | 200: usuário da sessão; 401 se ausente |
-| `POST` | `/api/auth/google` | Não | Body: `{ credential }`; cria sessão |
-| `POST` | `/api/auth/logout` | Não | 204; encerra sessão |
-| `GET` | `/api/auth/is-admin` | Sim | `{ isAdmin: boolean }` |
+### Fluxo mobile (redirect)
 
-### Empresa (formulário)
+1. `GoogleLogin` com `ux_mode=redirect`
+2. Google POST form-urlencoded para `login_uri` → `/api/auth/google/callback` (via proxy Vercel)
+3. Servidor valida, grava sessão, redirect 302 para `CLIENT_ORIGIN`
 
-| Método | Rota | Auth | Descrição |
-|--------|------|------|-----------|
-| `GET` | `/api/company` | User | Dados da empresa (id=1) para exibição no form |
-| `GET` | `/api/admin/company` | Admin | Mesmo registro para edição |
-| `PUT` | `/api/admin/company` | Admin | Body JSON: nome, endereço, CNPJ, e-mail |
+### CORS
 
-### Reembolsos (colaborador)
+- Rotas `POST /api/auth/google` e `POST /api/auth/google/callback` **ignoram** CORS estrito (navegação do Google)
+- Demais rotas: `CLIENT_ORIGIN` + `https://accounts.google.com`
 
-| Método | Rota | Auth | Descrição |
-|--------|------|------|-----------|
-| `GET` | `/api/reimbursements` | User | Lista do `ownerGoogleSub` logado |
-| `POST` | `/api/reimbursements` | User | `multipart`: campo `payload` (JSON string) + `files[]` (1 por despesa, mesma ordem) |
-| `PATCH` | `/api/reimbursements/:id/status` | User | Dono do reembolso; body `{ status }` — uso limitado no front atual |
+### Cookie de sessão
 
-**POST payload** (dentro de `payload`): `requesterName`, `requesterAddress?`, `requesterDocument`, `requesterEmail`, `expenses[]` com `description`, `expenseLine`, `accountCode?`, `amount`.
-
-**Upload:** Multer disco, até **15 MB** por arquivo, tipos `application/pdf`, `image/jpeg`, `image/png`. Arquivos renomeados com timestamp + nome sanitizado; depois movidos para `uploads/<reimbursementId>/`.
+- Nome: `reembolso.sid`
+- `httpOnly`, 7 dias, `secure` em produção
+- `sameSite: none` se `TRUST_CROSS_SITE_SESSION=1`; com proxy Vercel, same-origin usa cookie no domínio da Vercel
 
 ### Admin
 
-| Método | Rota | Auth | Descrição |
-|--------|------|------|-----------|
-| `GET` | `/api/admin/reimbursements` | Admin | Lista completa |
-| `GET` | `/api/admin/reimbursements/:id` | Admin | Detalhe com despesas e anexos por item (ver §7.1) |
-| `PATCH` | `/api/admin/reimbursements/:id/status` | Admin | Body `{ status: "enviado" \| "aprovado" \| "rejeitado" }` |
-| `GET` | `/api/admin/metrics` | Admin | Totais e contagens por status |
-
-### Lab
-
-| Método | Rota | Auth | Descrição |
-|--------|------|------|-----------|
-| `POST` | `/api/lab/extract` | User | Multipart em memória; análise de PDF/imagem (texto / hints) |
-
-### Arquivos estáticos
-
-- **`GET /uploads/...`** — servidos por `express.static(uploadsDir)` na API.
-- Em dev, o Vite proxy `/uploads` → API para o browser usar URLs relativas `/<storedPath>`.
+`requireAdmin` compara `req.session.user.email` com lista `ADMIN_EMAILS` (trim, case-sensitive).
 
 ---
 
-## 7. Modelo de dados (Prisma)
+## 5. API — referência resumida
 
-### Entidades
+Base em dev: `/api` (proxy Vite). Em prod (browser): `/api` (proxy Vercel).
 
-- **CompanySettings** — registro único `id = 1`.
-- **Reimbursement** — solicitação; `ownerGoogleSub` amarra ao login; `status` string (`enviado`, `aprovado`, `rejeitado`); `totalAmount` float.
-- **Expense** — linhas da solicitação; `amount` float; `accountCode` opcional.
-- **Attachment** — arquivo; `reimbursementId` obrigatório; `expenseId` opcional (vínculo por despesa).
+### Auth
 
-### IDs públicos de reembolso
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/auth/me` | Usuário da sessão |
+| `POST` | `/api/auth/google` | Login JSON (desktop) ou redirect form POST |
+| `POST` | `/api/auth/google/callback` | Callback redirect mobile |
+| `POST` | `/api/auth/logout` | Encerra sessão |
+| `GET` | `/api/auth/is-admin` | `{ isAdmin }` |
 
-- Formato: **`REIMB-` + 4 dígitos** (padding), ex.: `REIMB-0003`.
-- Implementação: `formatReimbursementId` / `parseDbIdFromPublicId` em `server/index.ts`.
-- Rotas que recebem `:id` esperam esse formato público.
+### Reembolsos
 
-### 7.1 Detalhe admin e anexos órfãos
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/reimbursements` | Lista do usuário logado |
+| `POST` | `/api/reimbursements` | Multipart: `payload` (JSON) + `files[]` |
+| `POST` | `/api/receipts/extract` | OCR/extração de um comprovante |
 
-No `GET /api/admin/reimbursements/:id`:
+**Payload `expenses[]`:** `description`, `expenseLine`, `accountCode?`, `amount`, `observation?`
 
-1. Anexos com `expenseId` são agrupados na despesa correspondente.
-2. Anexos com `expenseId == null` (legado) são ordenados por `id` e **atribuídos em memória** a despesas sem anexo, na ordem das despesas por `id`; excedentes vão para o último item.
-3. A resposta não inclui mais lista separada de “outros comprovantes”.
+### Admin
 
-Isso **não altera** o banco; apenas a projeção JSON. Novos envios devem gravar `expenseId` no create (loop por índice após `Expense.findMany` ordenado por `id`).
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/admin/reimbursements` | Lista completa |
+| `GET` | `/api/admin/reimbursements/:id` | Detalhe + despesas + anexos + observação |
+| `PATCH` | `/api/admin/reimbursements/:id/status` | `{ status }` |
+| `GET` | `/api/admin/metrics` | Dashboard |
+| `GET/PUT` | `/api/admin/company` | Dados da empresa |
 
----
-
-## 8. Front-end — rotas e módulos
-
-| Rota | Componente | Notas |
-|------|------------|-------|
-| `/` | `Index` | Login, formulário, histórico (`?view=list`) |
-| `/admin`, `/admin/empresa` | `AdminPage` | Abas: despesas, dashboard, empresa (pathname + `?tab=dashboard`) |
-| `/lab/extracao` | `ExtractLabPage` | Ferramenta interna |
-
-**Estado / hooks notáveis:** `useAuth`, `useReimbursementForm`, integração `fetch(..., { credentials: "include" })`.
-
-**Decisões admin (status):** `src/lib/adminReimbursementDecision.ts` — mapeia ações para status da API e mensagens de toast.
-
-**E-mail (templates):** `src/lib/expenseEmailTemplates.ts` — assunto/corpo e `mailto`; modal em `ExpenseEmailModal.tsx`.
+IDs públicos: `REIMB-0001` (formato `REIMB-` + 4 dígitos).
 
 ---
 
-## 9. Build e deploy (orientação)
+## 6. Modelo de dados (Prisma)
 
-1. **`npm run build`** gera `dist/` (somente SPA).
-2. A **API** precisa rodar em processo separado (ou serviço) servindo:
-   - rotas `/api`, `/uploads`, e em produção normalmente **não** o Vite.
-3. Configure **mesma política de origem** ou proxy reverso (Nginx, etc.) para:
-   - front estático ou CDN;
-   - API em path ou subdomínio;
-   - `CLIENT_ORIGIN` e Google OAuth com URLs HTTPS finais.
-4. **`SESSION_SECRET`** forte e **`GOOGLE_CLIENT_ID`** / **`VITE_GOOGLE_CLIENT_ID`** alinhados.
-5. Backup de **`prisma/dev.db`** (ou banco real se migrar de SQLite) e pasta **`uploads/`**.
+```
+CompanySettings (id=1) — dados da PX
+Reimbursement — solicitação (ownerGoogleSub, status, totalAmount)
+Expense — linha (description, expenseLine, accountCode, amount, observation?)
+Attachment — comprovante (expenseId?, storedPath, mimeType)
+```
 
----
-
-## 10. Segurança — checklist rápido
-
-- [ ] Não commitar `.env` com segredos reais.
-- [ ] `ADMIN_EMAILS` restrito a contas corporativas.
-- [ ] HTTPS em produção (`secure` cookie).
-- [ ] Limitar tamanho/tipo de upload (já há filtro Multer; revisar limites conforme política).
-- [ ] Revisar exposição de `/uploads` (URLs previsíveis; considerar auth ou tokens assinados em evoluções).
+**Migração recente:** `Expense.observation` (TEXT opcional) — `20260702120000_expense_observation`.
 
 ---
 
-## 11. Problemas conhecidos (dev)
+## 7. Front-end — rotas
 
-- **Windows / Prisma:** `EPERM` ao rodar `prisma generate` com servidor ou outro processo segurando `query_engine` — interromper `npm run dev` e executar `npx prisma generate` de novo.
-- **OAuth:** `origin_mismatch` no Google se a URL do browser não coincidir com “Origens JavaScript autorizadas” (porta inclusa).
+| Rota | Página |
+|------|--------|
+| `/` | Login, formulário, histórico (`?view=list`) |
+| `/admin` | Painel admin (despesas / dashboard) |
+| `/admin/empresa` | Configuração da empresa |
 
----
-
-## 12. Extensões sugeridas (técnicas)
-
-- Trocar SQLite por PostgreSQL (Prisma).
-- Testes e2e (Playwright) para fluxo login + submit.
-- OpenAPI gerada a partir de rotas ou Zod.
-- Job assíncrono para OCR/PDF pesado.
-- CDN ou object storage (S3) para anexos.
+**Hooks:** `useAuth`, `useReimbursementForm`  
+**Helpers:** `src/lib/apiBase.ts` (`apiUrl`, `googleAuthCallbackUrl`), `src/lib/isMobileBrowser.ts`
 
 ---
 
-*Última atualização alinhada ao estado do repositório; ajuste este arquivo quando alterar contratos de API ou schema.*
+## 8. Deploy
+
+1. **Push `main`** → Railway redeploy API (Dockerfile) + Vercel rebuild front
+2. Railway: volume em `/app/prisma` e `/app/uploads`
+3. Vercel: redeploy após mudar variáveis `VITE_*`
+4. Google Cloud: salvar origens/redirects; aguardar propagação (~5 min)
+
+Ver guias detalhados: [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md), [DEPLOY_API.md](./DEPLOY_API.md).
+
+---
+
+## 9. Segurança — checklist
+
+- [ ] `.env` fora do Git
+- [ ] `SESSION_SECRET` forte
+- [ ] `ADMIN_EMAILS` só contas corporativas
+- [ ] HTTPS em produção
+- [ ] Backup `dev.db` + `uploads/` no Railway
+- [ ] Revisar exposição de `/uploads` (URLs públicas na API)
+
+---
+
+## 10. Troubleshooting
+
+| Sintoma | Causa comum | Ação |
+|---------|-------------|------|
+| `Not allowed by CORS` no login mobile | Redirect Google bloqueado | Código atual ignora CORS nessas rotas; redeploy Railway |
+| Railway "Not Found" | URL errada no proxy | Conferir `vercel.json` e domínio Railway |
+| Login volta pra tela inicial | Cookie não persiste | Proxy Vercel ativo; `TRUST_CROSS_SITE_SESSION=1` |
+| `origin_mismatch` Google | URL não autorizada | Adicionar origem exata no Google Console |
+| Admin não aparece | E-mail fora de `ADMIN_EMAILS` | Atualizar variável no Railway |
+
+---
+
+*Última atualização: julho/2026.*

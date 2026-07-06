@@ -1,5 +1,11 @@
 import { useState, useCallback, useRef, useMemo } from "react";
-import { isPlaceholderExpense, parseExpenseAmount } from "@/lib/expenseAmount";
+import {
+  expenseLineTotal,
+  isPlaceholderExpense,
+  parseExpenseAmount,
+  primaryAttachmentName,
+  validateExpenseItemFields,
+} from "@/lib/expenseAmount";
 import {
   accountCodeForInferredLine,
   inferExpenseLineFromText,
@@ -63,7 +69,7 @@ function buildBulkAppend(
     supplierCnpj: "",
     supplierCnpjConfirmed: false,
     observation: "",
-    attachment: file,
+    attachments: [file],
     receiptProcessingStatus: "processing",
   }));
   return {
@@ -82,7 +88,7 @@ const createEmptyExpense = (id: number): Expense => ({
   supplierCnpj: "",
   supplierCnpjConfirmed: false,
   observation: "",
-  attachment: null,
+  attachments: [],
 });
 
 export function useReimbursementForm() {
@@ -98,7 +104,6 @@ export function useReimbursementForm() {
   formDataRef.current = formData;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  /** Linhas criadas automaticamente ao detectar assinatura de software (ex.: LICENCIAMENTO CLAUDE). */
   const [dynamicExpenseLines, setDynamicExpenseLines] = useState<Record<string, string>>({});
   const dynamicExpenseLinesRef = useRef(dynamicExpenseLines);
   dynamicExpenseLinesRef.current = dynamicExpenseLines;
@@ -156,29 +161,36 @@ export function useReimbursementForm() {
     []
   );
 
-  const addExpense = useCallback(() => {
-    setFormData((prev) => ({
-      ...prev,
-      expenses: [...prev.expenses, createEmptyExpense(nextExpenseId(prev.expenses))],
+  const addExpense = useCallback((): boolean => {
+    const prev = formDataRef.current;
+    const last = prev.expenses[prev.expenses.length - 1];
+    if (last && !isPlaceholderExpense(last)) {
+      const itemErrors = validateExpenseItemFields(last);
+      if (Object.keys(itemErrors).length > 0) {
+        setErrors((prevErr) => ({ ...prevErr, ...itemErrors }));
+        return false;
+      }
+    }
+    setFormData((p) => ({
+      ...p,
+      expenses: [...p.expenses, createEmptyExpense(nextExpenseId(p.expenses))],
     }));
+    return true;
   }, []);
 
-  const removeExpense = useCallback(
-    (id: number) => {
-      setFormData((prev) => ({
-        ...prev,
-        expenses: prev.expenses.filter((e) => e.id !== id),
-      }));
-      setErrors((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((k) => {
-          if (k.startsWith(`expense_${id}_`)) delete next[k];
-        });
-        return next;
+  const removeExpense = useCallback((id: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.filter((e) => e.id !== id),
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith(`expense_${id}_`)) delete next[k];
       });
-    },
-    []
-  );
+      return next;
+    });
+  }, []);
 
   const addExpensesFromFiles = useCallback(
     (
@@ -208,8 +220,9 @@ export function useReimbursementForm() {
       const addedItems = newIds
         .map((id) => {
           const item = next.expenses.find((e) => e.id === id);
-          if (!item?.attachment) return null;
-          return { id, file: item.attachment };
+          const file = item?.attachments[0];
+          if (!file) return null;
+          return { id, file };
         })
         .filter((x): x is { id: number; file: File } => Boolean(x));
 
@@ -219,7 +232,7 @@ export function useReimbursementForm() {
   );
 
   const updateExpense = useCallback(
-    (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => {
+    (id: number, field: keyof Omit<Expense, "id" | "attachments">, value: string) => {
       const dynamicBatch: Record<string, string> = {};
 
       setFormData((prev) => ({
@@ -231,7 +244,7 @@ export function useReimbursementForm() {
             next.supplierCnpjConfirmed = false;
           }
           if (field === "description" && value.trim() && !next.expenseLine.trim()) {
-            const inferred = inferExpenseLineFromText(value, e.attachment?.name ?? "");
+            const inferred = inferExpenseLineFromText(value, primaryAttachmentName(e));
             if (inferred) {
               const applied = applyExpenseLineToItem(next, inferred);
               next = applied.expense;
@@ -281,7 +294,7 @@ export function useReimbursementForm() {
           if (e.id !== id) return e;
           let next: Expense = { ...e };
 
-          if (data.description?.trim()) {
+          if (!next.description.trim() && data.description?.trim()) {
             next.description = data.description.trim();
           }
 
@@ -293,38 +306,45 @@ export function useReimbursementForm() {
             .filter((part) => typeof part === "string" && part.trim())
             .join("\n");
 
-          let line =
-            data.expenseLine?.trim() ||
-            inferExpenseLineFromText(haystack, e.attachment?.name ?? "") ||
-            "";
+          const attachmentHint = primaryAttachmentName(e);
 
-          if (!line && next.description.trim()) {
-            line =
-              inferExpenseLineFromText(next.description, e.attachment?.name ?? "") || "";
-          }
+          if (!next.expenseLine.trim()) {
+            let line =
+              data.expenseLine?.trim() ||
+              inferExpenseLineFromText(haystack, attachmentHint) ||
+              "";
 
-          if (line) {
-            const applied = applyExpenseLineToItem(
-              next,
-              line,
-              data.accountCode?.trim() ||
-                resolveAccountCodeForLine(line, dynamicExpenseLinesRef.current)
-            );
-            next = applied.expense;
-            if (applied.dynamicLine) {
-              dynamicBatch[applied.dynamicLine.line] = applied.dynamicLine.code;
+            if (!line && next.description.trim()) {
+              line = inferExpenseLineFromText(next.description, attachmentHint) || "";
             }
-          } else if (data.accountCode?.trim()) {
-            next.accountCode = data.accountCode.trim();
+
+            if (line) {
+              const applied = applyExpenseLineToItem(
+                next,
+                line,
+                data.accountCode?.trim() ||
+                  resolveAccountCodeForLine(line, dynamicExpenseLinesRef.current)
+              );
+              next = applied.expense;
+              if (applied.dynamicLine) {
+                dynamicBatch[applied.dynamicLine.line] = applied.dynamicLine.code;
+              }
+            } else if (data.accountCode?.trim() && !next.accountCode.trim()) {
+              next.accountCode = data.accountCode.trim();
+            }
           }
 
-          if (typeof data.amountBRL === "number" && data.amountBRL > 0) {
+          if (!next.amount.trim() && typeof data.amountBRL === "number" && data.amountBRL > 0) {
             next.amount = data.amountBRL.toFixed(2);
           }
-          if (typeof data.amountUSD === "number" && data.amountUSD > 0) {
+          if (
+            !(next.amountUsd ?? "").trim() &&
+            typeof data.amountUSD === "number" &&
+            data.amountUSD > 0
+          ) {
             next.amountUsd = data.amountUSD.toFixed(2);
           }
-          if (data.supplierCnpj?.trim()) {
+          if (!next.supplierCnpj?.trim() && data.supplierCnpj?.trim()) {
             next.supplierCnpj = data.supplierCnpj.trim();
             next.supplierCnpjConfirmed = false;
           }
@@ -373,34 +393,41 @@ export function useReimbursementForm() {
     });
   }, []);
 
-  const updateExpenseAttachment = useCallback((id: number, file: File | null) => {
+  const addExpenseAttachments = useCallback((id: number, files: File[]) => {
+    if (files.length === 0) return;
     setFormData((prev) => ({
       ...prev,
       expenses: prev.expenses.map((e) => {
         if (e.id !== id) return e;
-        if (!file) {
-          return {
-            ...e,
-            attachment: null,
-            amountUsd: e.amountUsd ?? "",
-            supplierCnpj: e.supplierCnpj ?? "",
-            receiptProcessingStatus: undefined,
-            receiptProcessingMessage: undefined,
-          };
-        }
         return {
           ...e,
-          attachment: file,
-          receiptProcessingStatus: undefined,
-          receiptProcessingMessage: undefined,
+          attachments: [...e.attachments, ...files],
         };
       }),
     }));
     setErrors((prev) => {
       const next = { ...prev };
-      delete next[`expense_${id}_attachment`];
+      delete next[`expense_${id}_attachments`];
       return next;
     });
+  }, []);
+
+  const removeExpenseAttachment = useCallback((id: number, index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) => {
+        if (e.id !== id) return e;
+        const attachments = e.attachments.filter((_, i) => i !== index);
+        return {
+          ...e,
+          attachments,
+          receiptProcessingStatus:
+            attachments.length === 0 ? undefined : e.receiptProcessingStatus,
+          receiptProcessingMessage:
+            attachments.length === 0 ? undefined : e.receiptProcessingMessage,
+        };
+      }),
+    }));
   }, []);
 
   const validate = useCallback((): Record<string, string> => {
@@ -417,23 +444,15 @@ export function useReimbursementForm() {
     }
 
     activeExpenses.forEach((e) => {
-      if (e.receiptProcessingStatus === "processing") {
-        newErrors[`expense_${e.id}_processing`] = "Aguarde o processamento deste comprovante.";
-      }
+      const itemErrors = validateExpenseItemFields(e);
+      Object.assign(newErrors, itemErrors);
       if (e.receiptProcessingStatus === "error") {
         newErrors[`expense_${e.id}_processing`] =
           e.receiptProcessingMessage ?? "Corrija ou remova este comprovante.";
       }
-      if (!e.description.trim()) newErrors[`expense_${e.id}_description`] = "Obrigatório";
-      if (!e.expenseLine) newErrors[`expense_${e.id}_expenseLine`] = "Obrigatório";
-      const amount = parseExpenseAmount(e.amount);
-      if (!e.amount.trim() || !Number.isFinite(amount) || amount <= 0) {
-        newErrors[`expense_${e.id}_amount`] = "Valor inválido";
-      }
       if (!e.supplierCnpj?.trim() && !e.supplierCnpjConfirmed) {
         newErrors[`expense_${e.id}_supplierCnpj`] = "Preencha o CNPJ ou confirme a ausência.";
       }
-      if (!e.attachment) newErrors[`expense_${e.id}_attachment`] = "Anexe o comprovante desta despesa";
     });
 
     setErrors(newErrors);
@@ -441,7 +460,7 @@ export function useReimbursementForm() {
   }, [formData]);
 
   const totalAmount = formData.expenses.reduce(
-    (sum, e) => sum + (parseExpenseAmount(e.amount) || 0),
+    (sum, e) => sum + expenseLineTotal(e),
     0
   );
 
@@ -471,7 +490,8 @@ export function useReimbursementForm() {
     applyExpenseExtractionResult,
     updateExpense,
     updateExpenseLine,
-    updateExpenseAttachment,
+    addExpenseAttachments,
+    removeExpenseAttachment,
     setExpenseCnpjConfirmed,
     validate,
     reset,

@@ -1,7 +1,8 @@
 import { Reimbursement } from "@/types/reimbursement";
 import { formatReimbursementDate } from "@/lib/formatLocalDate";
 import { Badge } from "@/components/ui/badge";
-import { FileText, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FileText, CheckCircle2, XCircle, Clock, Trash2, Loader2 } from "lucide-react";
 
 const statusConfig = {
   enviado: { label: "Enviado", icon: Clock, className: "bg-info/10 text-info border-info/20" },
@@ -20,9 +21,16 @@ const statusConfig = {
 interface Props {
   reimbursements: Reimbursement[];
   onSelect?: (reimbursement: Reimbursement) => void;
+  onDeleteRequest?: (reimbursement: Reimbursement) => void;
+  deletingReimbursementId?: string | null;
 }
 
-export function ReimbursementList({ reimbursements, onSelect }: Props) {
+export function ReimbursementList({
+  reimbursements,
+  onSelect,
+  onDeleteRequest,
+  deletingReimbursementId = null,
+}: Props) {
   if (reimbursements.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-12">
@@ -36,12 +44,13 @@ export function ReimbursementList({ reimbursements, onSelect }: Props) {
       {reimbursements.map((r) => {
         const status = statusConfig[r.status];
         const StatusIcon = status.icon;
+        const isDeleting = deletingReimbursementId === r.id;
         return (
           <div
             key={r.id}
             role={onSelect ? "button" : undefined}
             tabIndex={onSelect ? 0 : undefined}
-            onClick={onSelect ? () => onSelect(r) : undefined}
+            onClick={onSelect && !isDeleting ? () => onSelect(r) : undefined}
             onKeyDown={
               onSelect
                 ? (e) => {
@@ -51,7 +60,9 @@ export function ReimbursementList({ reimbursements, onSelect }: Props) {
             }
             className={[
               "rounded-2xl border border-border bg-card p-5 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 hover:shadow-refined",
-              onSelect ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background" : "",
+              onSelect && !isDeleting
+                ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
+                : "",
             ].join(" ")}
           >
             <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
@@ -71,13 +82,36 @@ export function ReimbursementList({ reimbursements, onSelect }: Props) {
               </p>
             </div>
 
-            <div className="text-right">
-              <p className="text-lg font-medium text-foreground tracking-tight">
-                R$ {r.totalAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {formatReimbursementDate(r.createdAt)}
-              </p>
+            <div className="flex items-center gap-2 md:gap-3 shrink-0 md:ml-auto">
+              <div className="text-right">
+                <p className="text-lg font-medium text-foreground tracking-tight tabular-nums">
+                  R$ {r.totalAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatReimbursementDate(r.createdAt)}
+                </p>
+              </div>
+              {onDeleteRequest && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={deletingReimbursementId !== null}
+                  className="h-9 w-9 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  aria-label={`Excluir reembolso ${r.id}`}
+                  title="Excluir reembolso"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteRequest(r);
+                  }}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         );

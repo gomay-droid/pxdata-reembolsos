@@ -2,7 +2,7 @@ import type { Expense } from "@/types/reimbursement";
 
 export function isPlaceholderExpense(e: Expense): boolean {
   return (
-    !e.attachment &&
+    e.attachments.length === 0 &&
     !e.description.trim() &&
     !e.expenseLine &&
     !e.amount.trim() &&
@@ -20,6 +20,19 @@ export function parseExpenseAmount(raw: string): number {
   return parseFloat(s);
 }
 
+/** Valor base (R$) + IOF/imposto = total da linha. */
+export function expenseLineTotal(e: Pick<Expense, "amount" | "amountUsd">): number {
+  const base = parseExpenseAmount(e.amount);
+  const tax = parseExpenseAmount(e.amountUsd ?? "");
+  const safeBase = Number.isFinite(base) ? base : 0;
+  const safeTax = Number.isFinite(tax) ? tax : 0;
+  return safeBase + safeTax;
+}
+
+export function primaryAttachmentName(e: Expense): string {
+  return e.attachments[0]?.name ?? "";
+}
+
 const VALIDATION_LABELS: Record<string, string> = {
   requesterName: "Nome do solicitante",
   requesterEmail: "E-mail do solicitante",
@@ -28,11 +41,11 @@ const VALIDATION_LABELS: Record<string, string> = {
 };
 
 const EXPENSE_FIELD_LABELS: Record<string, string> = {
-  description: "descrição",
+  description: "título/item da despesa",
   expenseLine: "linha de despesa",
   amount: "valor em R$",
   supplierCnpj: "CNPJ do fornecedor",
-  attachment: "comprovante anexado",
+  attachments: "comprovante anexado",
   processing: "processamento do comprovante",
 };
 
@@ -52,4 +65,29 @@ export function formatValidationToast(errors: Record<string, string>): string {
   const labels = keys.slice(0, 3).map(validationErrorLabel);
   const suffix = keys.length > 3 ? ` (+${keys.length - 3})` : "";
   return `Pendente: ${labels.join(", ")}${suffix}`;
+}
+
+/** Valida uma despesa individual (ex.: antes de adicionar nova linha). */
+export function validateExpenseItemFields(e: Expense): Record<string, string> {
+  const newErrors: Record<string, string> = {};
+
+  if (e.receiptProcessingStatus === "processing") {
+    newErrors[`expense_${e.id}_processing`] = "Aguarde o processamento do comprovante.";
+  }
+  if (e.attachments.length === 0) {
+    newErrors[`expense_${e.id}_attachments`] =
+      "Anexe pelo menos um comprovante para salvar esta despesa.";
+  }
+  if (!e.description.trim()) {
+    newErrors[`expense_${e.id}_description`] = "Informe o título/item da despesa.";
+  }
+  if (!e.expenseLine) {
+    newErrors[`expense_${e.id}_expenseLine`] = "Selecione a linha de despesa.";
+  }
+  const amount = parseExpenseAmount(e.amount);
+  if (!e.amount.trim() || !Number.isFinite(amount) || amount <= 0) {
+    newErrors[`expense_${e.id}_amount`] = "Informe o valor em R$.";
+  }
+
+  return newErrors;
 }
