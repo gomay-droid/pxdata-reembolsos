@@ -1,16 +1,20 @@
 # Documentação de produto — PX Data Reembolsos
 
-Documento orientado a **negócio e uso do sistema**, descrevendo propósito, personas, fluxos e funcionalidades. Para arquitetura, API e ambiente, veja a [documentação técnica](./DOCUMENTACAO_TECNICA.md).
+Documento orientado a **negócio e uso do sistema**: propósito, personas, fluxos e funcionalidades.
+
+**Relacionado:** [Documentação técnica](./DOCUMENTACAO_TECNICA.md) · [Deploy Vercel](./DEPLOY_VERCEL.md) · [Deploy API](./DEPLOY_API.md)
 
 ---
 
 ## 1. Visão geral
 
-**Nome interno do projeto:** `pxdata-reembolsos`  
+| Item | Descrição |
+|------|-----------|
+| **Nome do projeto** | `pxdata-reembolsos` |
+| **URL de produção (front)** | https://pxdata-reembolsos.vercel.app |
+| **Propósito** | Digitalizar pedidos de reembolso de despesas corporativas com login seguro, comprovante por despesa, extração automática de dados e painel financeiro para análise e decisão. |
 
-**Propósito:** digitalizar o pedido de reembolso de despesas corporativas, com **login seguro**, **formulário estruturado**, **comprovante por despesa** e **painel para o financeiro** acompanhar métricas e registrar decisões (aprovação, reprovação, contestação), com **comunicação opcional por e-mail** ao colaborador.
-
-**Stack em alto nível:** aplicação web (React + Vite), API própria (Node/Express), banco SQLite (Prisma), arquivos de comprovante armazenados no servidor.
+O colaborador envia solicitações com Google OAuth; o financeiro acompanha, aprova ou rejeita no painel admin, com opção de notificar por e-mail via modelos editáveis.
 
 ---
 
@@ -18,153 +22,162 @@ Documento orientado a **negócio e uso do sistema**, descrevendo propósito, per
 
 | Persona | Descrição | O que faz no sistema |
 |--------|-----------|----------------------|
-| **Colaborador** | Usuário autenticado com Google | Envia solicitações de reembolso, anexa comprovantes, consulta **apenas o próprio** histórico. |
-| **Financeiro / Admin** | E-mails configurados como administradores | Lista todas as solicitações, abre detalhes, altera status, usa modelos de e-mail, acessa **Dashboard** e **Dados da empresa**. |
+| **Colaborador** | Usuário autenticado com Google | Envia reembolsos, anexa comprovantes, consulta **apenas o próprio** histórico. |
+| **Financeiro / Admin** | E-mails listados em `ADMIN_EMAILS` (Railway) | Acessa `/admin`: lista solicitações, detalhes, dashboard, dados da empresa, exportação de planilha e decisões de status. |
+
+### Administradores configurados
+
+O acesso admin é definido **no servidor** (variável `ADMIN_EMAILS` no Railway), não no banco de dados.
+
+**Lista de referência no repositório** (`.env.example`):
+
+- `financeiro@pxdata.ai`
+- `mayco@pxdata.ai`
+- `bpofinanceiro@glip.com.br`
+
+> **Importante:** em produção, confira no Railway se `ADMIN_EMAILS` inclui todos os e-mails desejados, separados por vírgula, **sem espaços extras**. O e-mail `bpofinanceiro@glip.com.br` está no exemplo do projeto; se ainda não aparecer no painel admin para essa conta, adicione-o na variável do Railway e redeploy a API.
 
 ---
 
 ## 3. Acesso e segurança
 
-- **Autenticação:** login com **Google OAuth** (conta corporativa permitida nas configurações do projeto).
-- **Sessão:** mantida no servidor; o front consome rotas `/api/...` com credenciais (cookies).
-- **Administração:** apenas usuários cujo e-mail consta em `ADMIN_EMAILS` (variável de ambiente no servidor) têm acesso ao painel administrativo e às rotas `/api/admin/...`.
-- **Isolamento de dados:** colaboradores veem somente reembolsos vinculados ao próprio login; o admin vê o conjunto completo.
+- **Autenticação:** Google OAuth (conta Google do colaborador).
+- **Sessão:** cookie HTTP-only no servidor (`reembolso.sid`), 7 dias.
+- **Mobile:** login via redirect do Google (sem popup); API acessada pelo mesmo domínio da Vercel (proxy), para sessão funcionar no iPhone/Android.
+- **Isolamento:** cada colaborador vê só seus reembolsos; admin vê todos.
 
 ---
 
 ## 4. Jornada do colaborador
 
-### 4.1 Entrada e login
+### 4.1 Login
 
-1. Acessa a URL da aplicação (ex.: `http://localhost:5173` em desenvolvimento).
-2. Faz login com Google.
-3. Se as variáveis de OAuth não estiverem configuradas, o sistema exibe orientação de configuração em vez do botão de login.
+1. Acessa https://pxdata-reembolsos.vercel.app
+2. Clica em **Continuar com o Google**
+3. No celular, é redirecionado ao Google e volta automaticamente ao app
+4. Após login, vê o formulário de solicitação
 
-### 4.2 Nova solicitação (formulário principal)
+### 4.2 Nova solicitação
 
-Após o login, o usuário preenche:
+**Dados do solicitante**
 
-- **Dados do solicitante:** nome, endereço, documento (CPF/CNPJ), e-mail (com apoio de dados da empresa quando configurados).
-- **Uma ou mais despesas** na mesma solicitação, cada uma com:
-  - **Descrição** (com sugestões, ex.: ferramentas de IA).
-  - **Linha de despesa** (ex.: Alimentação, Viagem, Software/Assinatura).
-  - **Conta contábil** — preenchida automaticamente conforme a linha de despesa, podendo ser ajustada.
-  - **Valor (R$)**.
-  - **Comprovante obrigatório** por despesa (PDF ou imagem).
+- Nome, e-mail (pré-preenchido do Google), CPF/CNPJ, endereço (opcional)
+- Dados da empresa (PX) exibidos em bloco somente leitura
 
-**Regras de negócio relevantes:**
+**Comprovantes (upload em massa)**
 
-- É obrigatório **um arquivo por despesa**; a ordem dos arquivos no envio corresponde à ordem das despesas no formulário.
-- Para **PDF**, o sistema pode sugerir preenchimento de valor a partir do texto do documento (quando aplicável); imagens exigem valor manual.
-- O **total do reembolso** é a soma das despesas e é exibido de forma destacada.
+- Cada arquivo (PDF, JPG ou PNG, até 15 MB) vira **uma despesa**
+- O sistema tenta extrair automaticamente: descrição, linha de despesa, conta contábil, valor, CNPJ do fornecedor
 
-### 4.3 Envio
+**Campos por despesa**
 
-- Ao enviar com sucesso, a solicitação é criada com status inicial **Enviado** (pendente de análise).
-- O usuário pode ser direcionado ao **histórico** da própria conta.
+| Campo | Obrigatório | Descrição |
+|-------|-------------|-----------|
+| Descrição | Sim | Ex.: ferramenta de IA (com sugestões) |
+| Linha de despesa | Sim | Catálogo contábil (ex.: licenciamento de software) |
+| Conta contábil | Auto | Preenchida conforme a linha |
+| Valor (R$) | Sim | Valor do reembolso |
+| IOF | Não | Campo opcional para imposto |
+| CNPJ do fornecedor | Sim* | Ou confirmação de ausência na revisão final |
+| **Observação** | Não | Texto livre para informações adicionais sobre a despesa |
+| Comprovante | Sim | Um arquivo por despesa |
+
+### 4.3 Revisão final e envio
+
+Antes de enviar, o colaborador **obrigatoriamente**:
+
+1. Revisa todos os itens em modal dedicado
+2. Confirma CPF/CNPJ e dados extraídos
+3. Marca o checkbox de revisão final
+4. Confirma o envio
+
+Status inicial da solicitação: **Enviado** (pendente).
 
 ### 4.4 Histórico
 
-- Lista solicitações do usuário: identificador, valores, quantidade de despesas, **status** e data.
-- Parâmetro de URL `?view=list` pode ser usado para abrir diretamente a visão de lista.
-- O colaborador **não** altera o status pelo painel principal; isso é papel do financeiro (ou fluxos futuros).
+- Acesso pelo botão **Histórico** ou `?view=list`
+- Lista: ID (`REIMB-0001`), valor total, quantidade de despesas, status e data
 
 ---
 
-## 5. Estados da solicitação (status)
+## 5. Status da solicitação
 
-| Status (sistema) | Significado para o produto |
-|------------------|----------------------------|
-| **Enviado** (`enviado`) | Pendente de análise pelo financeiro. No dashboard admin aparece como “Pendente”. |
-| **Aprovado** (`aprovado`) | Solicitação aceita; segue o fluxo de pagamento/reembolso da empresa (fora deste sistema). |
-| **Rejeitado** (`rejeitado`) | Solicitação não aprovada. |
+| Status | Significado |
+|--------|-------------|
+| **Enviado** | Aguardando análise do financeiro |
+| **Aprovado** | Aceito; pagamento segue fora do sistema |
+| **Rejeitado** | Não aprovado |
 
-**Observação:** o status é da **solicitação inteira** (reembolso), não por linha de despesa individual na base de dados. Na interface admin, ações por item orientam decisão e comunicação, mas a atualização de status aplica-se ao reembolso como um todo.
+O status é da **solicitação inteira**, não por linha individual.
 
 ---
 
-## 6. Jornada do financeiro (administração)
+## 6. Jornada do financeiro (admin)
 
 ### 6.1 Acesso
 
-- Menu **Administração** (ícone de configurações) no cabeçalho — visível apenas para admins.
-- Rotas principais: `/admin`, `/admin?tab=dashboard`, `/admin/empresa`.
+- Ícone de engrenagem no cabeçalho (visível só para admins)
+- Rotas: `/admin`, `/admin?tab=dashboard`, `/admin/empresa`
 
-### 6.2 Aba **Despesas**
+### 6.2 Aba Despesas
 
-- Lista todas as solicitações.
-- Ao abrir um item, modal com: dados do solicitante, status, total, endereço, **itens** com comprovante (nome do arquivo + download), ações de decisão e notificação.
+- Lista todas as solicitações
+- Detalhe: solicitante, status, total, despesas com **observação** (quando preenchida), comprovantes para download
+- **Baixar planilha PX** (Excel no layout Nota Débito)
+- Ações: **Aprovar**, **Reprovar**, **Contestar** (volta para Enviado)
+- **Notificar por e-mail:** modelos editáveis + `mailto` (envio manual pelo gestor)
 
-**Ações por item (fluxo atual):**
+### 6.3 Aba Dashboard
 
-| Ação | Efeito imediato | E-mail |
-|------|-----------------|--------|
-| **Aprovar** | Status → **Aprovado** | Opcional: botão **Notificar por e-mail** ao lado das ações (modelo conforme status atual). |
-| **Reprovar** | Status → **Rejeitado** | Idem. |
-| **Contestar** | Status → **Enviado** (volta a pendente / contestação) | Idem. |
+- Cards: total de solicitações, valor solicitado, pendentes, aprovados
+- Atividade recente e gráfico de volume por mês
+- Distribuição por status
 
-- **Toast** confirma a alteração de status **sem** abrir o modal de e-mail automaticamente.
-- O **modal de e-mail** mantém assunto, corpo editável, copiar e abrir cliente de e-mail (`mailto`); é **independente** da gravação do status.
+### 6.4 Aba Dados da empresa
 
-### 6.3 Aba **Dashboard**
-
-- **Cards:** total de solicitações, valor total solicitado, pendentes, aprovados.
-- **Atividade recente:** últimas solicitações com solicitante, valor, status (rótulos amigáveis), data; clique abre detalhes.
-- **Status:** distribuição pendente / aprovado / rejeitado com barras.
-- **Gráfico:** evolução de valores por mês (com base nas solicitações carregadas).
-
-### 6.4 Aba **Dados da empresa**
-
-- Cadastro usado para **pré-preencher** ou exibir informações institucionais no formulário do colaborador (nome, endereço, CNPJ, e-mail da empresa).
-- Editável apenas por admin.
+- Nome, endereço, CNPJ e e-mail da PX
+- Usados no formulário do colaborador e na exportação de planilha
 
 ---
 
-## 7. Comprovantes e consistência
+## 7. Comprovantes e extração
 
-- Cada despesa deve ter **comprovante associado** no envio.
-- No armazenamento, o vínculo preferencial é por **`expenseId`** (despesa).
-- Registros antigos sem vínculo podem ser **associados na leitura** pelo admin para exibição coerente (heurística no servidor); o ideal operacional é que novos envios sempre gravem o vínculo corretamente.
-
----
-
-## 8. Laboratório de extração (`/lab/extracao`)
-
-- Área **interna** para testes de leitura de documento (texto / PDF / OCR conforme implementação).
-- Não faz parte do fluxo obrigatório do colaborador; serve a **validação técnica** e melhoria das heurísticas de valor.
+- Formato: PDF, JPG, PNG (máx. 15 MB)
+- Extração automática via OCR/PDF no servidor após upload
+- Cada comprovante fica vinculado à despesa correspondente
+- Falha na extração: colaborador preenche manualmente
 
 ---
 
-## 9. Glossário rápido
+## 8. Glossário
 
 | Termo | Definição |
 |-------|-----------|
-| **Solicitação / Reembolso** | Um pedido com N despesas e N comprovantes. |
-| **Despesa** | Linha do formulário: descrição, linha contábil, conta, valor, anexo. |
-| **Comprovante** | Arquivo (PDF ou imagem) obrigatório por despesa no envio. |
-| **Admin** | Usuário financeiro com permissões elevadas. |
-| **Pendente** | Rótulo de UX para status **Enviado** na visão consolidada. |
+| **Solicitação / Reembolso** | Pedido com N despesas e N comprovantes |
+| **Despesa** | Linha do formulário com valores, classificação e anexo |
+| **Observação** | Campo opcional de texto livre por despesa |
+| **Comprovante** | Arquivo obrigatório por despesa |
+| **Admin** | Usuário com e-mail em `ADMIN_EMAILS` |
+| **Pendente** | Rótulo de UX para status Enviado |
 
 ---
 
-## 10. Limitações e considerações de produto
+## 9. Limitações atuais
 
-- **E-mail:** não há envio automático pelo servidor; o produto oferece **modelos** e atalho para o cliente de e-mail do gestor.
-- **Status único por solicitação:** decisões “por item” na UI não criam status diferentes por despesa no modelo de dados atual.
-- **Ambiente:** URLs, OAuth e lista de admins dependem de **configuração** (`.env`); comportamento em produção deve ser revisado (HTTPS, domínios autorizados no Google, etc.).
-
----
-
-## 11. Roadmap sugerido (não implementado)
-
-Ideias frequentes para evolução de produto (referência apenas):
-
-- Status por despesa ou workflow com etapas.
-- Notificações por e-mail transacionais no backend.
-- Integração com ERP / folha.
-- Políticas de limite e alçadas.
-- Auditoria formal de quem alterou status e quando.
+- E-mail transacional não é enviado pelo servidor (apenas modelos + `mailto`)
+- Status único por solicitação (não por despesa)
+- CNPJ/IOF validados no front na revisão; persistência focada nos campos contábeis principais
+- Configuração de admins e OAuth depende de variáveis de ambiente
 
 ---
 
-*Documento gerado com base na versão atual do repositório. Atualize este arquivo quando houver mudanças relevantes de fluxo ou de regra de negócio.*
+## 10. Evoluções sugeridas (não implementadas)
+
+- Notificações automáticas por e-mail
+- Integração ERP / folha de pagamento
+- Status por despesa ou workflow com alçadas
+- Armazenamento de anexos em nuvem (S3)
+
+---
+
+*Última atualização: julho/2026 — inclui campo observação, login mobile e deploy Vercel + Railway.*

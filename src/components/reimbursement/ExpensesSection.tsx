@@ -30,6 +30,7 @@ import {
 import { ReceiptBulkUpload, toastBulkUploadSummary } from "@/components/reimbursement/ReceiptBulkUpload";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { expenseLineTotal } from "@/lib/expenseAmount";
 import { apiUrl } from "@/lib/apiBase";
 
 interface Props {
@@ -38,11 +39,12 @@ interface Props {
   totalAmount: number;
   expenseLineOptions: string[];
   accountCodeOptions: string[];
-  onAdd: () => void;
+  onAdd: () => boolean;
   onRemove: (id: number) => void;
-  onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
+  onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachments">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
-  onAttachmentChange: (id: number, file: File | null) => void;
+  onAddAttachments: (id: number, files: File[]) => void;
+  onRemoveAttachment: (id: number, index: number) => void;
   /** Um arquivo = uma despesa; validação e estado de processamento no hook. */
   addExpensesFromFiles: (
     files: File[]
@@ -75,7 +77,8 @@ export function ExpensesSection({
   onRemove,
   onUpdate,
   onExpenseLineChange,
-  onAttachmentChange,
+  onAddAttachments,
+  onRemoveAttachment,
   addExpensesFromFiles,
   setExpenseProcessingState,
   applyExpenseExtractionResult,
@@ -89,10 +92,7 @@ export function ExpensesSection({
     setOpenItems((prev) => ({ ...prev, [id]: !isOpen(id) }));
   };
 
-  const lineTotal = (e: Expense) => {
-    const n = parseFloat(e.amount);
-    return Number.isFinite(n) ? n : 0;
-  };
+  const lineTotal = (e: Expense) => expenseLineTotal(e);
 
   const processReceiptExtraction = async (id: number, file: File) => {
     setExpenseProcessingState(id, "processing");
@@ -182,7 +182,13 @@ export function ExpensesSection({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={onAdd}
+                onClick={() => {
+                  if (!onAdd()) {
+                    toast.error(
+                      "Anexe pelo menos um comprovante e preencha os campos obrigatórios antes de adicionar outra despesa."
+                    );
+                  }
+                }}
                 className="gap-2 border-border text-foreground hover:bg-accent h-10"
               >
                 <Plus className="h-4 w-4" />
@@ -220,8 +226,8 @@ export function ExpensesSection({
                     )}
                     <span className="text-sm font-medium text-foreground truncate">
                       Item {index + 1}
-                      {expense.attachment
-                        ? ` · ${expense.attachment.name}`
+                      {expense.attachments.length > 0
+                        ? ` · ${expense.attachments.length} anexo(s)`
                         : expense.description?.trim()
                           ? ` · ${expense.description.trim()}`
                           : ""}
@@ -378,16 +384,31 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm text-muted-foreground">IOF (opcional, imposto)</Label>
+                          <Label className="text-sm text-muted-foreground">IOF (imposto, opcional)</Label>
                           <Input
                             type="number"
                             step="0.01"
                             min="0"
                             value={expense.amountUsd ?? ""}
                             onChange={(e) => onUpdate(expense.id, "amountUsd", e.target.value)}
-                            placeholder="0.00"
+                            placeholder="0,00"
                             className="bg-secondary border-border font-light"
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Somado ao valor em R$ para formar o total da despesa.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2 md:col-span-2 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+                          <Label className="text-sm font-medium text-foreground">
+                            Valor total da despesa
+                          </Label>
+                          <p className="text-xl font-semibold text-primary tabular-nums">
+                            R${" "}
+                            {lineTotal(expense).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </p>
                         </div>
 
                         <div className="space-y-2 md:col-span-2">
@@ -412,64 +433,75 @@ export function ExpensesSection({
                         </div>
 
                         <div className="space-y-2 md:col-span-2">
-                          <Label className="text-sm text-muted-foreground">Comprovante desta despesa *</Label>
+                          <Label className="text-sm text-muted-foreground">
+                            Comprovantes desta despesa *
+                          </Label>
                           <p className="text-xs text-muted-foreground">
-                            O sistema tenta preencher descrição, classificação, CNPJ e valores automaticamente
-                            após anexar o arquivo. Se falhar, você pode editar tudo manualmente.
+                            Você pode anexar mais de um arquivo por despesa. O primeiro comprovante
+                            pode preencher os campos automaticamente; os demais são incluídos no envio.
                           </p>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                          <div className="flex flex-col gap-3">
                             <label
                               htmlFor={`attachment-${expense.id}`}
-                              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-secondary/50 px-4 py-3 text-sm text-foreground cursor-pointer hover:border-foreground/25 transition-colors duration-300"
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-secondary/50 px-4 py-3 text-sm text-foreground cursor-pointer hover:border-foreground/25 transition-colors duration-300 w-fit"
                             >
                               <Upload className="h-4 w-4 text-muted-foreground" />
-                              {expense.attachment ? "Trocar arquivo" : "Escolher arquivo"}
+                              Adicionar comprovante(s)
                             </label>
                             <input
                               id={`attachment-${expense.id}`}
                               type="file"
+                              multiple
                               accept={RECEIPT_ACCEPT_ATTR}
                               className="sr-only"
                               disabled={pdfExtractingId === expense.id}
                               onChange={(e) => {
-                                const f = e.target.files?.[0] ?? null;
+                                const picked = Array.from(e.target.files ?? []);
                                 e.target.value = "";
+                                if (picked.length === 0) return;
                                 void (async () => {
-                                  if (!f) {
-                                    onAttachmentChange(expense.id, null);
-                                    return;
+                                  const hadAttachments = expense.attachments.length > 0;
+                                  onAddAttachments(expense.id, picked);
+                                  const firstNew = picked[0];
+                                  if (!hadAttachments && firstNew) {
+                                    setPdfExtractingId(expense.id);
+                                    await processReceiptExtraction(expense.id, firstNew);
+                                    setPdfExtractingId(null);
                                   }
-                                  onAttachmentChange(expense.id, f);
-                                  setPdfExtractingId(expense.id);
-                                  await processReceiptExtraction(expense.id, f);
-                                  setPdfExtractingId(null);
                                 })();
                               }}
                             />
-                            {expense.attachment && (
-                              <div className="flex items-center gap-2 min-w-0 flex-1 rounded-2xl border border-border bg-card px-3 py-2">
-                                {expense.attachment.type.includes("pdf") ? (
-                                  <FileText className="h-4 w-4 text-destructive/70 shrink-0" />
-                                ) : (
-                                  <Image className="h-4 w-4 text-info shrink-0" />
-                                )}
-                                <span className="text-sm truncate">{expense.attachment.name}</span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 ml-auto shrink-0"
-                                  onClick={() => onAttachmentChange(expense.id, null)}
-                                  aria-label="Remover arquivo"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
+                            {expense.attachments.length > 0 && (
+                              <div className="space-y-2">
+                                {expense.attachments.map((file, fileIndex) => (
+                                  <div
+                                    key={`${file.name}-${fileIndex}`}
+                                    className="flex items-center gap-2 min-w-0 rounded-2xl border border-border bg-card px-3 py-2"
+                                  >
+                                    {file.type.includes("pdf") ? (
+                                      <FileText className="h-4 w-4 text-destructive/70 shrink-0" />
+                                    ) : (
+                                      <Image className="h-4 w-4 text-info shrink-0" />
+                                    )}
+                                    <span className="text-sm truncate flex-1">{file.name}</span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 shrink-0"
+                                      onClick={() => onRemoveAttachment(expense.id, fileIndex)}
+                                      aria-label="Remover arquivo"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
-                          {errors[`expense_${expense.id}_attachment`] && (
+                          {errors[`expense_${expense.id}_attachments`] && (
                             <p className="text-xs text-destructive">
-                              {errors[`expense_${expense.id}_attachment`]}
+                              {errors[`expense_${expense.id}_attachments`]}
                             </p>
                           )}
                         </div>

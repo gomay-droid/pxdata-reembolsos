@@ -1,9 +1,10 @@
 import { expenseLineOptionsWithCurrent } from "@/lib/expenseCatalog";
+import { expenseLineTotal } from "@/lib/expenseAmount";
 import { Expense } from "@/types/reimbursement";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, ClipboardCheck, DollarSign } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, DollarSign, FileText } from "lucide-react";
 
 interface Props {
   expenses: Expense[];
@@ -14,7 +15,7 @@ interface Props {
   totalAmount: number;
   expenseLineOptions: string[];
   accountCodeOptions: string[];
-  onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachment">, value: string) => void;
+  onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachments">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onCnpjConfirmedChange: (id: number, checked: boolean) => void;
   onRequesterUpdate: (
@@ -115,7 +116,7 @@ export function ReimbursementReviewSection({
             <p className="text-sm font-medium text-foreground">Despesa {idx + 1}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Descrição</Label>
+                <Label className="text-sm text-muted-foreground">Título / Item da despesa</Label>
                 <Input
                   value={expense.description}
                   onChange={(e) => onUpdate(expense.id, "description", e.target.value)}
@@ -206,7 +207,7 @@ export function ReimbursementReviewSection({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">IOF (opcional, imposto)</Label>
+                <Label className="text-sm text-muted-foreground">IOF (imposto, opcional)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -215,6 +216,14 @@ export function ReimbursementReviewSection({
                   onChange={(e) => onUpdate(expense.id, "amountUsd", e.target.value)}
                   className="h-11 bg-card border-border font-light"
                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2">
+                <Label className="text-sm text-muted-foreground">Valor total da despesa</Label>
+                <p className="text-lg font-semibold text-primary tabular-nums">
+                  R${" "}
+                  {expenseLineTotal(expense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </p>
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -227,9 +236,26 @@ export function ReimbursementReviewSection({
                   className="flex w-full rounded-2xl border border-input bg-card px-4 py-3 font-light ring-offset-background placeholder:text-muted-foreground transition-colors duration-300 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-foreground/25 resize-y min-h-[5rem]"
                 />
               </div>
+
+              {expense.attachments.length > 0 && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-sm text-muted-foreground">Comprovantes anexados</Label>
+                  <ul className="space-y-1">
+                    {expense.attachments.map((file, i) => (
+                      <li
+                        key={`${file.name}-${i}`}
+                        className="flex items-center gap-2 text-sm text-muted-foreground"
+                      >
+                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-            {errors[`expense_${expense.id}_attachment`] && (
-              <p className="text-xs text-destructive">{errors[`expense_${expense.id}_attachment`]}</p>
+            {errors[`expense_${expense.id}_attachments`] && (
+              <p className="text-xs text-destructive">{errors[`expense_${expense.id}_attachments`]}</p>
             )}
             {errors[`expense_${expense.id}_processing`] && (
               <p className="text-xs text-destructive">{errors[`expense_${expense.id}_processing`]}</p>

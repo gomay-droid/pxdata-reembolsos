@@ -432,6 +432,8 @@ type PayloadExpense = {
   accountCode?: string;
   amount: string | number;
   observation?: string;
+  /** Quantidade de arquivos desta despesa (ordem sequencial em files[]). */
+  attachmentCount?: number;
 };
 
 type PayloadBody = {
@@ -470,7 +472,7 @@ app.get("/api/reimbursements", requireAuth, async (req, res) => {
 app.post(
   "/api/reimbursements",
   requireAuth,
-  upload.array("files", 20),
+  upload.array("files", 50),
   async (req, res) => {
     const ownerSub = req.session.user!.sub;
     let payload: PayloadBody;
@@ -496,13 +498,22 @@ app.post(
     if (files.length === 0) {
       return res.status(400).json({ error: "Anexe o comprovante em cada despesa" });
     }
-    if (files.length !== payload.expenses.length) {
+
+    const expectedFiles = payload.expenses.reduce(
+      (sum, e) => sum + Math.max(0, e.attachmentCount ?? 1),
+      0
+    );
+    if (files.length !== expectedFiles) {
       return res.status(400).json({
-        error: `Envie um comprovante por despesa (${payload.expenses.length} arquivo(s) esperado(s), ${files.length} recebido(s)).`,
+        error: `Quantidade de arquivos incorreta (${expectedFiles} esperado(s), ${files.length} recebido(s)).`,
       });
     }
 
     for (const e of payload.expenses) {
+      const count = e.attachmentCount ?? 1;
+      if (count < 1) {
+        return res.status(400).json({ error: "Cada despesa precisa de pelo menos um comprovante" });
+      }
       if (!e.description?.trim() || !e.expenseLine) {
         return res.status(400).json({ error: "Cada despesa precisa de descrição e linha" });
       }
@@ -547,22 +558,28 @@ app.post(
         orderBy: { id: "asc" },
       });
 
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        const expenseRow = expensesOrdered[i];
-        if (!expenseRow) break;
-        const dest = path.join(subDir, f.filename);
-        fs.renameSync(f.path, dest);
-        await prisma.attachment.create({
-          data: {
-            reimbursementId: created.id,
-            expenseId: expenseRow.id,
-            originalName: f.originalname,
-            storedPath: path.relative(rootDir, dest).replace(/\\/g, "/"),
-            mimeType: f.mimetype,
-            size: f.size,
-          },
-        });
+      let fileIndex = 0;
+      for (let expIdx = 0; expIdx < expensesOrdered.length; expIdx++) {
+        const expenseRow = expensesOrdered[expIdx];
+        const payloadExpense = payload.expenses[expIdx];
+        if (!expenseRow || !payloadExpense) break;
+        const count = payloadExpense.attachmentCount ?? 1;
+        for (let j = 0; j < count; j++) {
+          const f = files[fileIndex++];
+          if (!f) break;
+          const dest = path.join(subDir, f.filename);
+          fs.renameSync(f.path, dest);
+          await prisma.attachment.create({
+            data: {
+              reimbursementId: created.id,
+              expenseId: expenseRow.id,
+              originalName: f.originalname,
+              storedPath: path.relative(rootDir, dest).replace(/\\/g, "/"),
+              mimeType: f.mimetype,
+              size: f.size,
+            },
+          });
+        }
       }
 
       res.status(201).json({
@@ -763,6 +780,99 @@ app.patch("/api/admin/reimbursements/:id/status", requireAuth, requireAdmin, asy
     res.status(404).json({ error: "Reembolso não encontrado" });
   }
 });
+
+app.delete("/api/admin/reimbursements/:id", requireAuth, requireAdmin, async (req, res) => {
+  const dbId = parseDbIdFromPublicId(req.params.id);
+  if (dbId === null) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+
+  try {
+    const reimbursement = await prisma.reimbursement.findUnique({
+      where: { id: dbId },
+      include: { attachments: true },
+    });
+    if (!reimbursement) {
+      return res.status(404).json({ error: "Reembolso não encontrado" });
+    }
+
+    for (const att of reimbursement.attachments) {
+      const abs = path.join(rootDir, att.storedPath);
+      try {
+        if (fs.existsSync(abs)) fs.unlinkSync(abs);
+      } catch (e) {
+        console.warn("[admin/delete-reimbursement] falha ao remover arquivo:", abs, e);
+      }
+    }
+
+    const uploadDir = path.join(uploadsDir, String(dbId));
+    try {
+      if (fs.existsSync(uploadDir)) fs.rmSync(uploadDir, { recursive: true, force: true });
+    } catch (e) {
+      console.warn("[admin/delete-reimbursement] falha ao remover pasta:", uploadDir, e);
+    }
+
+    await prisma.reimbursement.delete({ where: { id: dbId } });
+
+    res.json({ id: formatReimbursementId(dbId) });
+  } catch (e) {
+    console.error("[admin/delete-reimbursement]", e);
+    res.status(500).json({ error: "Erro ao excluir reembolso" });
+  }
+});
+
+app.delete(
+  "/api/admin/reimbursements/:id/expenses/:expenseId",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const dbId = parseDbIdFromPublicId(req.params.id);
+    if (dbId === null) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    const expenseId = Number.parseInt(req.params.expenseId, 10);
+    if (!Number.isFinite(expenseId)) {
+      return res.status(400).json({ error: "ID da despesa inválido" });
+    }
+
+    try {
+      const expense = await prisma.expense.findFirst({
+        where: { id: expenseId, reimbursementId: dbId },
+        include: { attachments: true },
+      });
+      if (!expense) {
+        return res.status(404).json({ error: "Despesa não encontrada" });
+      }
+
+      for (const att of expense.attachments) {
+        const abs = path.join(rootDir, att.storedPath);
+        try {
+          if (fs.existsSync(abs)) fs.unlinkSync(abs);
+        } catch (e) {
+          console.warn("[admin/delete-expense] falha ao remover arquivo:", abs, e);
+        }
+      }
+
+      await prisma.expense.delete({ where: { id: expenseId } });
+
+      const remaining = await prisma.expense.findMany({
+        where: { reimbursementId: dbId },
+        select: { amount: true },
+      });
+      const totalAmount = remaining.reduce((sum, e) => sum + e.amount, 0);
+
+      await prisma.reimbursement.update({
+        where: { id: dbId },
+        data: { totalAmount },
+      });
+
+      res.json({ expenseId, totalAmount });
+    } catch (e) {
+      console.error("[admin/delete-expense]", e);
+      res.status(500).json({ error: "Erro ao excluir despesa" });
+    }
+  }
+);
 
 /** Extração estruturada do comprovante: descrição, classificação, valores e CNPJ. */
 app.post("/api/receipts/extract", requireAuth, receiptUpload.single("file"), async (req, res) => {

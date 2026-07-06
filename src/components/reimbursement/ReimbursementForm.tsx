@@ -8,7 +8,7 @@ import { ReimbursementReviewSection } from "@/components/reimbursement/Reimburse
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/apiBase";
-import { formatValidationToast, isPlaceholderExpense } from "@/lib/expenseAmount";
+import { expenseLineTotal, formatValidationToast, isPlaceholderExpense } from "@/lib/expenseAmount";
 import type { CompanyProfile } from "@/types/company";
 import { Send, Loader2 } from "lucide-react";
 
@@ -46,7 +46,8 @@ export default function ReimbursementForm({
     applyExpenseExtractionResult,
     updateExpense,
     updateExpenseLine,
-    updateExpenseAttachment,
+    addExpenseAttachments,
+    removeExpenseAttachment,
     setExpenseCnpjConfirmed,
     validate,
     reset,
@@ -88,29 +89,29 @@ export default function ReimbursementForm({
       return;
     }
 
+    const active = formData.expenses.filter((e) => !isPlaceholderExpense(e));
     const payload = {
       requesterName: formData.requesterName,
       requesterAddress: formData.requesterAddress,
       requesterDocument: formData.requesterDocument,
       requesterEmail: formData.requesterEmail,
-      expenses: formData.expenses
-        .filter((e) => !isPlaceholderExpense(e))
-        .map(({ description, expenseLine, accountCode, amount, observation }) => ({
+      expenses: active.map(
+        ({ description, expenseLine, accountCode, amount, amountUsd, observation, attachments }) => ({
           description,
           expenseLine,
           accountCode,
-          amount,
+          amount: expenseLineTotal({ amount, amountUsd }).toFixed(2),
           observation,
-        })),
+          attachmentCount: attachments.length,
+        })
+      ),
     };
 
     const fd = new FormData();
     fd.append("payload", JSON.stringify(payload));
-    formData.expenses
-      .filter((e) => !isPlaceholderExpense(e))
-      .forEach((e) => {
-        if (e.attachment) fd.append("files", e.attachment);
-      });
+    active.forEach((e) => {
+      e.attachments.forEach((file) => fd.append("files", file));
+    });
 
     setSubmitting(true);
     try {
@@ -196,7 +197,8 @@ export default function ReimbursementForm({
           applyExpenseExtractionResult={applyExpenseExtractionResult}
           onUpdate={updateExpense}
           onExpenseLineChange={updateExpenseLine}
-          onAttachmentChange={updateExpenseAttachment}
+          onAddAttachments={addExpenseAttachments}
+          onRemoveAttachment={removeExpenseAttachment}
         />
       </div>
 

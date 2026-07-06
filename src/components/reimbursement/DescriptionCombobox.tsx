@@ -41,7 +41,7 @@ export function DescriptionCombobox({ inputId, value, onChange, error }: Props) 
   return (
     <div ref={rootRef} className="md:col-span-2 space-y-2">
       <Label htmlFor={inputId} className="text-sm text-muted-foreground">
-        Descrição *
+        Título / Item da despesa *
       </Label>
       <div className="relative">
         <Input
@@ -52,7 +52,7 @@ export function DescriptionCombobox({ inputId, value, onChange, error }: Props) 
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Digite ou escolha uma sugestão na lista"
+          placeholder="Ex.: Cursor, ChatGPT, passagem aérea…"
           className="bg-secondary border-border font-light"
           autoComplete="off"
         />

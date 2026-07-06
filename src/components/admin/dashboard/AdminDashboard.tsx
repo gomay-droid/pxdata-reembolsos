@@ -12,6 +12,8 @@ interface Props {
   reimbursements: Reimbursement[];
   metricsLoaded: boolean;
   onOpenReimbursement?: (r: Reimbursement) => void;
+  onDeleteReimbursement?: (r: Reimbursement) => void;
+  deletingReimbursementId?: string | null;
   className?: string;
 }
 
@@ -20,6 +22,8 @@ export function AdminDashboard({
   reimbursements,
   metricsLoaded,
   onOpenReimbursement,
+  onDeleteReimbursement,
+  deletingReimbursementId,
   className,
 }: Props) {
   if (!metrics) {
@@ -61,6 +65,8 @@ export function AdminDashboard({
         <AdminDashboardRecentList
           reimbursements={reimbursements}
           onSelect={onOpenReimbursement}
+          onDeleteRequest={onDeleteReimbursement}
+          deletingReimbursementId={deletingReimbursementId}
         />
         <AdminDashboardStatusBreakdown metrics={metrics} />
       </div>
