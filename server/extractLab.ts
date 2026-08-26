@@ -265,6 +265,8 @@ export type ReceiptExtractionResult = {
   amountBRL: number | null;
   amountUSD: number | null;
   supplierCnpj: string | null;
+  /** Litros abastecidos, quando identificados na nota (postos). */
+  litersFilled: number | null;
   confidence: "low" | "medium" | "high";
 };
 
@@ -298,8 +300,24 @@ function extractAmountUSD(text: string): number | null {
   return Math.max(...numbers);
 }
 
+function extractLitersFilled(text: string): number | null {
+  const patterns = [
+    /(?:qtde|qtd|quantidade|volume|litros?|lts?)\s*(?:abastecid[oa]s?|de\s+combust[ií]vel)?\s*[:\-]?\s*([\d.,]+)\s*(?:l(?:itros?)?|lts?)?\b/i,
+    /\b([\d.,]+)\s*(?:lts?|litros?)\b/i,
+    /\b([\d.,]+)\s*L\b/,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m?.[1]) continue;
+    const n = brlToNumber(m[1]) ?? Number.parseFloat(m[1].replace(/\./g, "").replace(",", "."));
+    if (Number.isFinite(n) && n > 0 && n < 500) return n;
+  }
+  return null;
+}
+
 function inferDescription(text: string, filename: string, line: string | null): string {
   if (/\bclaude(\s+pro)?\b/i.test(text)) return "Claude Pro";
+  if (/\b(combust[ií]vel|posto|gasolina|etanol|diesel|abastec)/i.test(text)) return "Abastecimento";
   if (/\buber\b/i.test(text)) return "Corrida Uber";
   if (/ifood/i.test(text)) return "Pedido iFood";
   if (/\bhotel|airbnb|booking\b/i.test(text)) return "Hospedagem";
@@ -317,6 +335,7 @@ export function buildReceiptExtraction(text: string, filename: string): ReceiptE
   const amountBRL = extractAmountBRL(normalized);
   const amountUSD = extractAmountUSD(normalized);
   const supplierCnpj = extractCnpj(normalized);
+  const litersFilled = extractLitersFilled(normalized);
   const description = inferDescription(normalized, filename, line);
   if (!line && description) {
     line = inferExpenseLineFromText(`${description}\n${normalized}`, filename);
@@ -324,9 +343,12 @@ export function buildReceiptExtraction(text: string, filename: string): ReceiptE
   const accountCode = line ? accountCodeForInferredLine(line) : null;
 
   let confidence: ReceiptExtractionResult["confidence"] = "low";
-  const signals = [amountBRL !== null || amountUSD !== null, Boolean(supplierCnpj), Boolean(line)].filter(
-    Boolean
-  ).length;
+  const signals = [
+    amountBRL !== null || amountUSD !== null,
+    Boolean(supplierCnpj),
+    Boolean(line),
+    litersFilled !== null,
+  ].filter(Boolean).length;
   if (signals >= 3) confidence = "high";
   else if (signals === 2) confidence = "medium";
 
@@ -337,6 +359,7 @@ export function buildReceiptExtraction(text: string, filename: string): ReceiptE
     amountBRL,
     amountUSD,
     supplierCnpj,
+    litersFilled,
     confidence,
   };
 }

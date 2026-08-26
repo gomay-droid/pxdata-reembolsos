@@ -1,9 +1,12 @@
 import { expenseLineOptionsWithCurrent } from "@/lib/expenseCatalog";
 import { expenseLineTotal } from "@/lib/expenseAmount";
+import { isFuelExpenseLine } from "@/lib/fuelConsumption";
+import type { FuelConsumptionLimits } from "@/lib/fuelConfig";
 import { Expense } from "@/types/reimbursement";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FuelExpenseFields } from "@/components/reimbursement/FuelExpenseFields";
 import { AlertTriangle, ClipboardCheck, DollarSign, FileText } from "lucide-react";
 
 interface Props {
@@ -15,6 +18,7 @@ interface Props {
   totalAmount: number;
   expenseLineOptions: string[];
   accountCodeOptions: string[];
+  fuelLimits?: Partial<FuelConsumptionLimits> | null;
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachments">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onCnpjConfirmedChange: (id: number, checked: boolean) => void;
@@ -37,6 +41,7 @@ export function ReimbursementReviewSection({
   totalAmount,
   expenseLineOptions,
   accountCodeOptions,
+  fuelLimits,
   onUpdate,
   onExpenseLineChange,
   onCnpjConfirmedChange,
@@ -225,6 +230,21 @@ export function ReimbursementReviewSection({
                   {expenseLineTotal(expense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </p>
               </div>
+
+              {isFuelExpenseLine(expense.expenseLine) && (
+                <FuelExpenseFields
+                  values={{
+                    odometerStart: expense.odometerStart,
+                    odometerEnd: expense.odometerEnd,
+                    litersFilled: expense.litersFilled,
+                  }}
+                  limits={fuelLimits}
+                  amountLabel={`R$ ${expenseLineTotal(expense).toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                  })}`}
+                  onChange={(field, value) => onUpdate(expense.id, field, value)}
+                />
+              )}
 
               <div className="space-y-2 md:col-span-2">
                 <Label className="text-sm text-muted-foreground">Observação (opcional)</Label>

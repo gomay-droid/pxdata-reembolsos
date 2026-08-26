@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/apiBase";
 import { expenseLineTotal, formatValidationToast, isPlaceholderExpense } from "@/lib/expenseAmount";
+import { parseFuelNumber } from "@/lib/fuelConsumption";
 import type { CompanyProfile } from "@/types/company";
 import { Send, Loader2 } from "lucide-react";
 
@@ -57,6 +58,13 @@ export default function ReimbursementForm({
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
+  const fuelLimits = companyProfile
+    ? {
+        minKmPerLiter: companyProfile.fuelMinKmPerLiter,
+        maxKmPerLiter: companyProfile.fuelMaxKmPerLiter,
+      }
+    : null;
+
   useEffect(() => {
     if (!authProfile?.email) return;
 
@@ -96,13 +104,27 @@ export default function ReimbursementForm({
       requesterDocument: formData.requesterDocument,
       requesterEmail: formData.requesterEmail,
       expenses: active.map(
-        ({ description, expenseLine, accountCode, amount, amountUsd, observation, attachments }) => ({
+        ({
+          description,
+          expenseLine,
+          accountCode,
+          amount,
+          amountUsd,
+          observation,
+          attachments,
+          odometerStart,
+          odometerEnd,
+          litersFilled,
+        }) => ({
           description,
           expenseLine,
           accountCode,
           amount: expenseLineTotal({ amount, amountUsd }).toFixed(2),
           observation,
           attachmentCount: attachments.length,
+          odometerStart: parseFuelNumber(odometerStart),
+          odometerEnd: parseFuelNumber(odometerEnd),
+          litersFilled: parseFuelNumber(litersFilled),
         })
       ),
     };
@@ -190,6 +212,7 @@ export default function ReimbursementForm({
           totalAmount={totalAmount}
           expenseLineOptions={expenseLineOptions}
           accountCodeOptions={accountCodeOptions}
+          fuelLimits={fuelLimits}
           onAdd={addExpense}
           onRemove={removeExpense}
           addExpensesFromFiles={addExpensesFromFiles}
@@ -251,6 +274,7 @@ export default function ReimbursementForm({
                 totalAmount={totalAmount}
                 expenseLineOptions={expenseLineOptions}
                 accountCodeOptions={accountCodeOptions}
+                fuelLimits={fuelLimits}
                 onUpdate={updateExpense}
                 onExpenseLineChange={updateExpenseLine}
                 onCnpjConfirmedChange={setExpenseCnpjConfirmed}

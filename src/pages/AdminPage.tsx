@@ -20,6 +20,7 @@ import {
   Loader2,
   Mail,
   MessageSquareWarning,
+  RefreshCw,
   Sheet,
   Shield,
   Trash2,
@@ -31,6 +32,10 @@ import { formatReimbursementDate } from "@/lib/formatLocalDate";
 import { CompanySettingsPanel } from "@/components/admin/CompanySettingsPanel";
 import { BrandLogoMark } from "@/components/BrandLogoMark";
 import { AdminDashboard } from "@/components/admin/dashboard/AdminDashboard";
+import { FuelExpenseFields } from "@/components/reimbursement/FuelExpenseFields";
+import { isFuelExpenseLine } from "@/lib/fuelConsumption";
+import { resolveFuelConsumptionLimits } from "@/lib/fuelConfig";
+import type { CompanyProfile } from "@/types/company";
 import { apiUrl, assetUrl } from "@/lib/apiBase";
 
 type AdminTab = "despesas" | "dashboard" | "empresa";
@@ -59,6 +64,9 @@ type AdminReimbursementDetails = {
     accountCode?: string | null;
     amount: number;
     observation?: string | null;
+    odometerStart?: number | null;
+    odometerEnd?: number | null;
+    litersFilled?: number | null;
     attachments?: Array<{
       id: number;
       originalName: string;
@@ -203,6 +211,7 @@ export default function AdminPage() {
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [metricsLoaded, setMetricsLoaded] = useState(false);
+  const [fuelLimits, setFuelLimits] = useState(() => resolveFuelConsumptionLimits(null));
 
   const loadIsAdmin = useCallback(async () => {
     setAdminLoading(true);
@@ -224,13 +233,21 @@ export default function AdminPage() {
   const loadExpenses = useCallback(async () => {
     setLoadingExpenses(true);
     try {
-      const res = await fetch(apiUrl("/api/admin/reimbursements"), { credentials: "include" });
+      const res = await fetch(apiUrl("/api/admin/reimbursements"), {
+        credentials: "include",
+        cache: "no-store",
+      });
       if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
         setReimbursements([]);
+        toast.error(data.error ?? "Não foi possível carregar todos os reembolsos");
         return;
       }
       const data = (await res.json()) as Reimbursement[];
-      setReimbursements(data);
+      setReimbursements(Array.isArray(data) ? data : []);
+    } catch {
+      setReimbursements([]);
+      toast.error("Falha de rede ao carregar reembolsos do admin");
     } finally {
       setLoadingExpenses(false);
       setExpensesLoaded(true);
@@ -344,13 +361,34 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    if ((tab === "despesas" || tab === "dashboard") && !expensesLoaded && !loadingExpenses) {
+    void (async () => {
+      try {
+        const res = await fetch(apiUrl("/api/admin/company"), { credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as CompanyProfile;
+        setFuelLimits(
+          resolveFuelConsumptionLimits({
+            minKmPerLiter: data.fuelMinKmPerLiter,
+            maxKmPerLiter: data.fuelMaxKmPerLiter,
+          })
+        );
+      } catch {
+        /* mantém defaults */
+      }
+    })();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    // Sempre recarrega ao entrar nas abas — evita lista desatualizada após novos envios.
+    if ((tab === "despesas" || tab === "dashboard") && !loadingExpenses) {
       void loadExpenses();
     }
-    if (tab === "dashboard" && !metricsLoaded && !loadingMetrics) {
+    if (tab === "dashboard" && !loadingMetrics) {
       void loadMetrics();
     }
-  }, [isAdmin, tab, expensesLoaded, metricsLoaded, loadingExpenses, loadingMetrics, loadExpenses, loadMetrics]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reagir a mudança de aba/admin
+  }, [isAdmin, tab]);
 
   useEffect(() => {
     if (!user && !loading) {
@@ -435,10 +473,27 @@ export default function AdminPage() {
                   ? "Edite nome, endereço, CNPJ e e-mail exibidos no formulário de reembolso"
                   : tab === "dashboard"
                     ? "Visão geral, status e evolução dos reembolsos"
-                    : "Gerencie despesas e acompanhe métricas"}
+                    : "Todas as solicitações enviadas por todos os colaboradores"}
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {tab === "despesas" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingExpenses}
+                  className="gap-1.5"
+                  onClick={() => void loadExpenses()}
+                >
+                  {loadingExpenses ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Atualizar
+                </Button>
+              )}
               <Button
                 type="button"
                 variant={tab === "despesas" ? "default" : "outline"}
@@ -479,6 +534,7 @@ export default function AdminPage() {
                 onSelect={openDetails}
                 onDeleteRequest={isAdmin ? requestDeleteReimbursement : undefined}
                 deletingReimbursementId={deletingReimbursementId}
+                emptyMessage="Nenhum reembolso enviado ainda por nenhum colaborador."
               />
             )}
           </section>
@@ -615,6 +671,22 @@ export default function AdminPage() {
                             R$ {e.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                           </div>
                         </div>
+                        {isFuelExpenseLine(e.expenseLine) && (
+                          <FuelExpenseFields
+                            readOnly
+                            limits={fuelLimits}
+                            amountLabel={`R$ ${e.amount.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}`}
+                            values={{
+                              odometerStart:
+                                e.odometerStart != null ? String(e.odometerStart) : "",
+                              odometerEnd: e.odometerEnd != null ? String(e.odometerEnd) : "",
+                              litersFilled:
+                                e.litersFilled != null ? String(e.litersFilled) : "",
+                            }}
+                          />
+                        )}
                         <div className="rounded-2xl border border-border/70 bg-muted/15 p-3 space-y-2">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             Comprovante desta despesa

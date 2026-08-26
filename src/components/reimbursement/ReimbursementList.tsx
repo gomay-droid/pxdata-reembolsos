@@ -23,6 +23,7 @@ interface Props {
   onSelect?: (reimbursement: Reimbursement) => void;
   onDeleteRequest?: (reimbursement: Reimbursement) => void;
   deletingReimbursementId?: string | null;
+  emptyMessage?: string;
 }
 
 export function ReimbursementList({
@@ -30,11 +31,12 @@ export function ReimbursementList({
   onSelect,
   onDeleteRequest,
   deletingReimbursementId = null,
+  emptyMessage = "Nenhuma solicitação ainda. Envie um reembolso na aba Novo.",
 }: Props) {
   if (reimbursements.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-12">
-        Nenhuma solicitação ainda. Envie um reembolso na aba Novo.
+        {emptyMessage}
       </p>
     );
   }
@@ -42,7 +44,7 @@ export function ReimbursementList({
   return (
     <div className="space-y-3">
       {reimbursements.map((r) => {
-        const status = statusConfig[r.status];
+        const status = statusConfig[r.status] ?? statusConfig.enviado;
         const StatusIcon = status.icon;
         const isDeleting = deletingReimbursementId === r.id;
         return (

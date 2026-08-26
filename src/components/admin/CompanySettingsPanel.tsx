@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { CompanyProfile } from "@/types/company";
+import { DEFAULT_FUEL_CONSUMPTION_LIMITS } from "@/lib/fuelConfig";
 import { Building2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/apiBase";
@@ -15,6 +16,8 @@ export function CompanySettingsPanel() {
     address: "",
     cnpj: "",
     email: "",
+    fuelMinKmPerLiter: DEFAULT_FUEL_CONSUMPTION_LIMITS.minKmPerLiter,
+    fuelMaxKmPerLiter: DEFAULT_FUEL_CONSUMPTION_LIMITS.maxKmPerLiter,
   });
 
   useEffect(() => {
@@ -23,7 +26,16 @@ export function CompanySettingsPanel() {
         const res = await fetch(apiUrl("/api/admin/company"), { credentials: "include" });
         if (res.ok) {
           const data = (await res.json()) as CompanyProfile;
-          setForm(data);
+          setForm({
+            name: data.name,
+            address: data.address,
+            cnpj: data.cnpj,
+            email: data.email,
+            fuelMinKmPerLiter:
+              data.fuelMinKmPerLiter ?? DEFAULT_FUEL_CONSUMPTION_LIMITS.minKmPerLiter,
+            fuelMaxKmPerLiter:
+              data.fuelMaxKmPerLiter ?? DEFAULT_FUEL_CONSUMPTION_LIMITS.maxKmPerLiter,
+          });
         } else {
           toast.error("Não foi possível carregar os dados da empresa");
         }
@@ -35,7 +47,7 @@ export function CompanySettingsPanel() {
     })();
   }, []);
 
-  const update = (field: keyof CompanyProfile, value: string) => {
+  const update = (field: keyof CompanyProfile, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -58,8 +70,14 @@ export function CompanySettingsPanel() {
         address: data.address,
         cnpj: data.cnpj,
         email: data.email,
+        fuelMinKmPerLiter:
+          data.fuelMinKmPerLiter ?? DEFAULT_FUEL_CONSUMPTION_LIMITS.minKmPerLiter,
+        fuelMaxKmPerLiter:
+          data.fuelMaxKmPerLiter ?? DEFAULT_FUEL_CONSUMPTION_LIMITS.maxKmPerLiter,
       });
-      toast.success("Dados da empresa atualizados. O formulário de reembolso passará a exibir estas informações.");
+      toast.success(
+        "Dados da empresa atualizados. O formulário de reembolso passará a exibir estas informações."
+      );
     } catch {
       toast.error("Erro de rede ao salvar");
     } finally {
@@ -126,6 +144,39 @@ export function CompanySettingsPanel() {
             onChange={(e) => update("email", e.target.value)}
             autoComplete="email"
           />
+        </div>
+
+        <div className="pt-2 border-t border-border space-y-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Alertas de combustível (km/L)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Faixa esperada de consumo médio. Fora dela, o sistema só alerta — não bloqueia o envio.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="co-fuel-min">Consumo mínimo esperado (km/L)</Label>
+              <Input
+                id="co-fuel-min"
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={form.fuelMinKmPerLiter ?? DEFAULT_FUEL_CONSUMPTION_LIMITS.minKmPerLiter}
+                onChange={(e) => update("fuelMinKmPerLiter", Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="co-fuel-max">Consumo máximo esperado (km/L)</Label>
+              <Input
+                id="co-fuel-max"
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={form.fuelMaxKmPerLiter ?? DEFAULT_FUEL_CONSUMPTION_LIMITS.maxKmPerLiter}
+                onChange={(e) => update("fuelMaxKmPerLiter", Number(e.target.value))}
+              />
+            </div>
+          </div>
         </div>
 
         <Button

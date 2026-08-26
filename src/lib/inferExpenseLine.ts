@@ -6,7 +6,8 @@ import {
 } from "./expenseCatalog";
 
 const EXPENSE_LINE_KEYWORDS: Array<{ line: string; re: RegExp }> = [
-  { line: "TRANSPORTE", re: /\b(uber|99|taxi|cabify|corrida|combust[ií]vel|posto)\b/i },
+  { line: "COMBUSTÍVEL", re: /\b(combust[ií]vel|posto|gasolina|etanol|diesel|abastec)/i },
+  { line: "TRANSPORTE", re: /\b(uber|99|taxi|cabify|corrida)\b/i },
   { line: "PEDÁGIO", re: /\bped[aá]gio\b/i },
   { line: "ESTACIONAMENTO", re: /\bestacionamento\b/i },
   { line: "PASSAGENS", re: /\b(passagem|voo|a[ée]reo|rodovi[aá]ria)\b/i },

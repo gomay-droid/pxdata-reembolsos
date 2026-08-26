@@ -16,9 +16,11 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
-const uploadsDir = path.join(rootDir, "uploads");
 
 dotenv.config({ path: path.join(rootDir, ".env") });
+
+const uploadsDir =
+  process.env.UPLOADS_DIR?.trim() || path.join(rootDir, "uploads");
 
 // Garante que a pasta base de uploads exista antes do Multer escrever arquivos.
 // Sem isso, o upload pode falhar com ENOENT (no such file or directory).
@@ -36,7 +38,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET ?? "dev-only-mude-em-producao"
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
-  .map((s) => s.trim())
+  .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
 /** Front na Vercel + API em outro domínio: cookie de sessão precisa SameSite=None + Secure. */
@@ -180,7 +182,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const email = req.session.user?.email;
+  const email = req.session.user?.email?.trim().toLowerCase();
   if (!ADMIN_EMAILS.length) {
     return res.status(403).json({ error: "Admin não configurado. Defina ADMIN_EMAILS no .env." });
   }
@@ -222,7 +224,7 @@ app.get("/api/auth/me", (req, res) => {
 });
 
 app.get("/api/auth/is-admin", requireAuth, (req, res) => {
-  const email = req.session.user?.email;
+  const email = req.session.user?.email?.trim().toLowerCase();
   const isAdmin = Boolean(email && ADMIN_EMAILS.includes(email));
   res.json({ isAdmin });
 });
@@ -240,6 +242,8 @@ app.get("/api/company", requireAuth, async (_req, res) => {
       address: row.address,
       cnpj: row.cnpj,
       email: row.email,
+      fuelMinKmPerLiter: row.fuelMinKmPerLiter,
+      fuelMaxKmPerLiter: row.fuelMaxKmPerLiter,
     });
   } catch (e) {
     console.error(e);
@@ -260,6 +264,8 @@ app.get("/api/admin/company", requireAuth, requireAdmin, async (_req, res) => {
       address: row.address,
       cnpj: row.cnpj,
       email: row.email,
+      fuelMinKmPerLiter: row.fuelMinKmPerLiter,
+      fuelMaxKmPerLiter: row.fuelMaxKmPerLiter,
     });
   } catch (e) {
     console.error(e);
@@ -273,19 +279,34 @@ app.put("/api/admin/company", requireAuth, requireAdmin, async (req, res) => {
     const address = String(req.body?.address ?? "").trim();
     const cnpj = String(req.body?.cnpj ?? "").trim();
     const email = String(req.body?.email ?? "").trim();
+    const fuelMinRaw = Number(req.body?.fuelMinKmPerLiter);
+    const fuelMaxRaw = Number(req.body?.fuelMaxKmPerLiter);
     if (!name || !address || !cnpj || !email) {
       return res.status(400).json({ error: "Nome, endereço, CNPJ e e-mail são obrigatórios" });
     }
+    const fuelMinKmPerLiter =
+      Number.isFinite(fuelMinRaw) && fuelMinRaw > 0 ? fuelMinRaw : 8;
+    const fuelMaxKmPerLiter =
+      Number.isFinite(fuelMaxRaw) && fuelMaxRaw > 0 ? fuelMaxRaw : 18;
     await ensureCompanySettings();
     const updated = await prisma.companySettings.update({
       where: { id: 1 },
-      data: { name, address, cnpj, email },
+      data: {
+        name,
+        address,
+        cnpj,
+        email,
+        fuelMinKmPerLiter: Math.min(fuelMinKmPerLiter, fuelMaxKmPerLiter),
+        fuelMaxKmPerLiter: Math.max(fuelMinKmPerLiter, fuelMaxKmPerLiter),
+      },
     });
     res.json({
       name: updated.name,
       address: updated.address,
       cnpj: updated.cnpj,
       email: updated.email,
+      fuelMinKmPerLiter: updated.fuelMinKmPerLiter,
+      fuelMaxKmPerLiter: updated.fuelMaxKmPerLiter,
     });
   } catch (e) {
     console.error(e);
@@ -434,6 +455,9 @@ type PayloadExpense = {
   observation?: string;
   /** Quantidade de arquivos desta despesa (ordem sequencial em files[]). */
   attachmentCount?: number;
+  odometerStart?: number | null;
+  odometerEnd?: number | null;
+  litersFilled?: number | null;
 };
 
 type PayloadBody = {
@@ -545,6 +569,18 @@ app.post(
               amount:
                 typeof e.amount === "string" ? parseFloat(e.amount) : Number(e.amount),
               observation: e.observation?.trim() || null,
+              odometerStart:
+                typeof e.odometerStart === "number" && Number.isFinite(e.odometerStart)
+                  ? e.odometerStart
+                  : null,
+              odometerEnd:
+                typeof e.odometerEnd === "number" && Number.isFinite(e.odometerEnd)
+                  ? e.odometerEnd
+                  : null,
+              litersFilled:
+                typeof e.litersFilled === "number" && Number.isFinite(e.litersFilled)
+                  ? e.litersFilled
+                  : null,
             })),
           },
         },
@@ -624,6 +660,7 @@ app.patch("/api/reimbursements/:id/status", requireAuth, async (req, res) => {
 
 app.get("/api/admin/reimbursements", requireAuth, requireAdmin, async (req, res) => {
   try {
+    // Sem filtro por owner: admin vê TODOS os reembolsos de todos os usuários.
     const rows = await prisma.reimbursement.findMany({
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { expenses: true } } },
@@ -639,6 +676,7 @@ app.get("/api/admin/reimbursements", requireAuth, requireAdmin, async (req, res)
       createdAt: r.createdAt.toISOString(),
     }));
 
+    res.setHeader("Cache-Control", "no-store");
     res.json(list);
   } catch (e) {
     console.error(e);

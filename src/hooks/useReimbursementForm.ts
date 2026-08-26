@@ -69,6 +69,9 @@ function buildBulkAppend(
     supplierCnpj: "",
     supplierCnpjConfirmed: false,
     observation: "",
+    odometerStart: "",
+    odometerEnd: "",
+    litersFilled: "",
     attachments: [file],
     receiptProcessingStatus: "processing",
   }));
@@ -88,6 +91,9 @@ const createEmptyExpense = (id: number): Expense => ({
   supplierCnpj: "",
   supplierCnpjConfirmed: false,
   observation: "",
+  odometerStart: "",
+  odometerEnd: "",
+  litersFilled: "",
   attachments: [],
 });
 
@@ -284,6 +290,7 @@ export function useReimbursementForm() {
         amountBRL?: number | null;
         amountUSD?: number | null;
         supplierCnpj?: string | null;
+        litersFilled?: number | null;
       }
     ) => {
       const dynamicBatch: Record<string, string> = {};
@@ -347,6 +354,13 @@ export function useReimbursementForm() {
           if (!next.supplierCnpj?.trim() && data.supplierCnpj?.trim()) {
             next.supplierCnpj = data.supplierCnpj.trim();
             next.supplierCnpjConfirmed = false;
+          }
+          if (
+            !(next.litersFilled ?? "").trim() &&
+            typeof data.litersFilled === "number" &&
+            data.litersFilled > 0
+          ) {
+            next.litersFilled = data.litersFilled.toFixed(2);
           }
           next.receiptProcessingStatus = "extracted";
           next.receiptProcessingMessage = undefined;

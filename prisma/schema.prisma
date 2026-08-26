@@ -4,17 +4,21 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 /** Configuração única (id = 1) — dados da empresa exibidos no formulário de reembolso. */
 model CompanySettings {
-  id        Int      @id @default(1)
-  name      String
-  address   String
-  cnpj      String
-  email     String
-  updatedAt DateTime @updatedAt
+  id                 Int      @id @default(1)
+  name               String
+  address            String
+  cnpj               String
+  email              String
+  /** Limite inferior esperado de consumo (km/L) para alertas de combustível. */
+  fuelMinKmPerLiter  Float    @default(8)
+  /** Limite superior esperado de consumo (km/L) para alertas de combustível. */
+  fuelMaxKmPerLiter  Float    @default(18)
+  updatedAt          DateTime @updatedAt
 }
 
 model Reimbursement {
@@ -38,8 +42,16 @@ model Expense {
   description     String
   expenseLine     String
   accountCode     String?
+  /** Data em que a despesa ocorreu (independente de Reimbursement.createdAt). */
+  expenseDate     DateTime
   amount          Float
   observation     String?
+  /** Odômetro no início do trecho (km) — usado em COMBUSTÍVEL. */
+  odometerStart   Float?
+  /** Odômetro no fim do trecho (km) — usado em COMBUSTÍVEL. */
+  odometerEnd     Float?
+  /** Litros abastecidos — usado em COMBUSTÍVEL. */
+  litersFilled    Float?
   attachments     Attachment[]
 }
 

@@ -32,6 +32,9 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { expenseLineTotal } from "@/lib/expenseAmount";
 import { apiUrl } from "@/lib/apiBase";
+import { isFuelExpenseLine } from "@/lib/fuelConsumption";
+import type { FuelConsumptionLimits } from "@/lib/fuelConfig";
+import { FuelExpenseFields } from "@/components/reimbursement/FuelExpenseFields";
 
 interface Props {
   expenses: Expense[];
@@ -39,6 +42,7 @@ interface Props {
   totalAmount: number;
   expenseLineOptions: string[];
   accountCodeOptions: string[];
+  fuelLimits?: Partial<FuelConsumptionLimits> | null;
   onAdd: () => boolean;
   onRemove: (id: number) => void;
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachments">, value: string) => void;
@@ -63,6 +67,7 @@ interface Props {
       amountBRL?: number | null;
       amountUSD?: number | null;
       supplierCnpj?: string | null;
+      litersFilled?: number | null;
     }
   ) => void;
 }
@@ -73,6 +78,7 @@ export function ExpensesSection({
   totalAmount,
   expenseLineOptions,
   accountCodeOptions,
+  fuelLimits,
   onAdd,
   onRemove,
   onUpdate,
@@ -113,6 +119,7 @@ export function ExpensesSection({
           amountBRL?: number | null;
           amountUSD?: number | null;
           supplierCnpj?: string | null;
+          litersFilled?: number | null;
         };
       };
       if (!res.ok) {
@@ -410,6 +417,18 @@ export function ExpensesSection({
                             })}
                           </p>
                         </div>
+
+                        {isFuelExpenseLine(expense.expenseLine) && (
+                          <FuelExpenseFields
+                            values={{
+                              odometerStart: expense.odometerStart,
+                              odometerEnd: expense.odometerEnd,
+                              litersFilled: expense.litersFilled,
+                            }}
+                            limits={fuelLimits}
+                            onChange={(field, value) => onUpdate(expense.id, field, value)}
+                          />
+                        )}
 
                         <div className="space-y-2 md:col-span-2">
                           <Label className="text-sm text-muted-foreground">CNPJ do fornecedor</Label>

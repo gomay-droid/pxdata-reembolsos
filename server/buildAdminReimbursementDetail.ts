@@ -25,6 +25,9 @@ export type AdminExpenseRowJson = {
   accountCode: string | null;
   amount: number;
   observation: string | null;
+  odometerStart: number | null;
+  odometerEnd: number | null;
+  litersFilled: number | null;
   attachments: AdminExpenseAttachmentJson[];
 };
 
@@ -68,6 +71,9 @@ export function buildAdminExpenseRowsForJson(
     accountCode: e.accountCode,
     amount: e.amount,
     observation: e.observation,
+    odometerStart: e.odometerStart,
+    odometerEnd: e.odometerEnd,
+    litersFilled: e.litersFilled,
     attachments: (linkedByExpenseId.get(e.id) ?? []).map(toJson),
   }));
 

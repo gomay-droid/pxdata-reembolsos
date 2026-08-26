@@ -6,6 +6,8 @@ export interface Expense {
   description: string;
   expenseLine: string;
   accountCode: string;
+  /** Data da despesa (YYYY-MM-DD no formulário). */
+  expenseDate: string;
   amount: string;
   /** Valor original em dólar (quando identificado). Mantém espaço para futura conversão cambial. */
   amountUsd?: string;
@@ -17,6 +19,12 @@ export interface Expense {
   attachments: File[];
   /** Informações adicionais sobre a despesa (opcional). */
   observation?: string;
+  /** Odômetro inicial (km) — apenas COMBUSTÍVEL. */
+  odometerStart?: string;
+  /** Odômetro final (km) — apenas COMBUSTÍVEL. */
+  odometerEnd?: string;
+  /** Litros abastecidos — apenas COMBUSTÍVEL (OCR ou manual). */
+  litersFilled?: string;
   /** Presente quando o item veio do upload em massa ou anexo único com pipeline de extração. */
   receiptProcessingStatus?: ExpenseReceiptProcessingStatus;
   /** Mensagem amigável quando status é erro. */
