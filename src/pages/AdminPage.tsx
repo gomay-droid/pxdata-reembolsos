@@ -114,6 +114,7 @@ export default function AdminPage() {
   const statusPatchLockRef = useRef(false);
   const [patchingDecision, setPatchingDecision] = useState<AdminReimbursementDecision | null>(null);
   const [downloadingSpreadsheet, setDownloadingSpreadsheet] = useState(false);
+  const [sendingToFinance, setSendingToFinance] = useState(false);
   const [expensePendingDelete, setExpensePendingDelete] = useState<{
     id: number;
     description: string;
@@ -142,7 +143,10 @@ export default function AdminPage() {
             body: JSON.stringify({ status }),
           }
         );
-        const data = (await res.json().catch(() => ({}))) as { error?: string; status?: string };
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          status?: string;
+        };
         if (!res.ok) {
           toast.error(data.error ?? "Não foi possível atualizar o status");
           return;
@@ -283,7 +287,10 @@ export default function AdminPage() {
         toast.error(data.error ?? "Não foi possível baixar a planilha");
         return;
       }
-      const blob = await res.blob();
+      const buf = await res.arrayBuffer();
+      const blob = new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       const disposition = res.headers.get("Content-Disposition") ?? "";
       const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
       const filename = match?.[1] ?? `nota-debito-${reimbursementId}.xlsx`;
@@ -297,6 +304,27 @@ export default function AdminPage() {
       toast.error("Falha ao baixar a planilha");
     } finally {
       setDownloadingSpreadsheet(false);
+    }
+  }, []);
+
+  const sendReimbursementToFinance = useCallback(async (reimbursementId: string) => {
+    setSendingToFinance(true);
+    try {
+      const res = await fetch(
+        apiUrl(`/api/admin/reimbursements/${encodeURIComponent(reimbursementId)}/send-to-finance`),
+        { method: "POST", credentials: "include" }
+      );
+      const data = (await res.json().catch(() => ({}))) as { error?: string; to?: string[] };
+      if (!res.ok) {
+        toast.error(data.error ?? "Não foi possível enviar ao financeiro");
+        return;
+      }
+      const dest = data.to?.length ? ` (${data.to.join(", ")})` : "";
+      toast.success(`Pacote enviado ao financeiro${dest}`);
+    } catch {
+      toast.error("Falha ao enviar e-mail ao financeiro");
+    } finally {
+      setSendingToFinance(false);
     }
   }, []);
 
@@ -633,21 +661,42 @@ export default function AdminPage() {
                       A planilha PX exporta todos os itens desta solicitação em um único arquivo.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5 h-9 shrink-0"
-                    disabled={downloadingSpreadsheet || selected.expenses.length === 0}
-                    onClick={() => void downloadReimbursementSpreadsheet(selected.id)}
-                  >
-                    {downloadingSpreadsheet ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Sheet className="h-3.5 w-3.5" />
-                    )}
-                    Baixar planilha PX
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5 h-9"
+                      disabled={downloadingSpreadsheet || selected.expenses.length === 0}
+                      onClick={() => void downloadReimbursementSpreadsheet(selected.id)}
+                    >
+                      {downloadingSpreadsheet ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sheet className="h-3.5 w-3.5" />
+                      )}
+                      Baixar planilha PX
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 h-9"
+                      disabled={
+                        sendingToFinance ||
+                        downloadingSpreadsheet ||
+                        selected.expenses.length === 0
+                      }
+                      onClick={() => void sendReimbursementToFinance(selected.id)}
+                    >
+                      {sendingToFinance ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Mail className="h-3.5 w-3.5" />
+                      )}
+                      Enviar ao financeiro
+                    </Button>
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-border overflow-hidden">
                   <div className="divide-y divide-border">

@@ -66,7 +66,10 @@ flowchart LR
 | `GOOGLE_CLIENT_ID` | Mesmo ID do cliente OAuth Web |
 | `SESSION_SECRET` | String longa aleatória |
 | `CLIENT_ORIGIN` | `https://pxdata-reembolsos.vercel.app` (vírgula se múltiplas origens) |
-| `ADMIN_EMAILS` | E-mails admin separados por vírgula |
+| `ADMIN_EMAILS` | E-mails admin separados por vírgula. No rename do Workspace, trocar `@pxcreativelab.com` → `@luria.ai` |
+| `FINANCE_EMAIL` | Destinatário do pacote automático (`financeiro@pxdata.ai`) |
+| `RESEND_API_KEY` | Chave da API Resend |
+| `RESEND_FROM` | Remetente do domínio verificado no Resend |
 | `TRUST_CROSS_SITE_SESSION` | `1` |
 | `NODE_ENV` | `production` |
 | `PORT` | Injetado pelo Railway |
@@ -87,6 +90,8 @@ A lista efetiva em produção é **somente** a variável no Railway — alteraç
 | `VITE_API_BASE_URL` | Opcional em prod (browser usa `/api` relativo via proxy) |
 
 ### Google Cloud Console
+
+OAuth **Interno** na organização Workspace. O rename do domínio primário (`@pxcreativelab.com` → `@luria.ai`) na **mesma** org não exige reconfigurar o consentimento: o login usa o `sub` do Google. Só `ADMIN_EMAILS` precisa ser atualizado no Railway.
 
 **Origens JavaScript autorizadas:**
 
@@ -128,7 +133,9 @@ A lista efetiva em produção é **somente** a variável no Railway — alteraç
 
 ### Admin
 
-`requireAdmin` compara `req.session.user.email` com lista `ADMIN_EMAILS` (trim, case-sensitive).
+`requireAdmin` compara `req.session.user.email` com a lista `ADMIN_EMAILS` (trim + minúsculas). Comparação exata de endereço: na troca de domínio do Workspace, substitua cada e-mail de admin no Railway.
+
+O envio ao financeiro dispara em `POST /api/reimbursements` (após gravar a solicitação), via Resend, para `FINANCE_EMAIL`. Comprovantes que estouram ~28 MB binários (~40 MB em base64) vão como link (`CLIENT_ORIGIN` + path em `uploads/`).
 
 ---
 
@@ -151,7 +158,7 @@ Base em dev: `/api` (proxy Vite). Em prod (browser): `/api` (proxy Vercel).
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `GET` | `/api/reimbursements` | Lista do usuário logado |
-| `POST` | `/api/reimbursements` | Multipart: `payload` (JSON) + `files[]` |
+| `POST` | `/api/reimbursements` | Multipart: `payload` (JSON) + `files[]` — após salvar, e-mail ao financeiro |
 | `POST` | `/api/receipts/extract` | OCR/extração de um comprovante |
 
 **Payload `expenses[]`:** `description`, `expenseLine`, `accountCode?`, `amount`, `observation?`
@@ -163,6 +170,8 @@ Base em dev: `/api` (proxy Vite). Em prod (browser): `/api` (proxy Vercel).
 | `GET` | `/api/admin/reimbursements` | Lista completa |
 | `GET` | `/api/admin/reimbursements/:id` | Detalhe + despesas + anexos + observação |
 | `PATCH` | `/api/admin/reimbursements/:id/status` | `{ status }` |
+| `GET` | `/api/admin/reimbursements/:id/spreadsheet` | Download `.xlsx` (Nota Débito) |
+| `POST` | `/api/admin/reimbursements/:id/send-to-finance` | E-mail ao financeiro com planilha + comprovantes |
 | `GET` | `/api/admin/metrics` | Dashboard |
 | `GET/PUT` | `/api/admin/company` | Dados da empresa |
 
@@ -225,6 +234,7 @@ Ver guias detalhados: [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md), [DEPLOY_API.md](./
 | `Not allowed by CORS` no login mobile | Redirect Google bloqueado | Código atual ignora CORS nessas rotas; redeploy Railway |
 | Railway "Not Found" | URL errada no proxy | Conferir `vercel.json` e domínio Railway |
 | Login volta pra tela inicial | Cookie não persiste | Proxy Vercel ativo; `TRUST_CROSS_SITE_SESSION=1` |
+| Planilha Excel pede reparo | Template do Google Planilhas regravado | Export atual preenche o ZIP sem ExcelJS; baixe de novo após o deploy |
 | `origin_mismatch` Google | URL não autorizada | Adicionar origem exata no Google Console |
 | Admin não aparece | E-mail fora de `ADMIN_EMAILS` | Atualizar variável no Railway |
 

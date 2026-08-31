@@ -14,7 +14,7 @@ Documento orientado a **negócio e uso do sistema**: propósito, personas, fluxo
 | **URL de produção (front)** | https://pxdata-reembolsos.vercel.app |
 | **Propósito** | Digitalizar pedidos de reembolso de despesas corporativas com login seguro, comprovante por despesa, extração automática de dados e painel financeiro para análise e decisão. |
 
-O colaborador envia solicitações com Google OAuth; o financeiro acompanha, aprova ou rejeita no painel admin, com opção de notificar por e-mail via modelos editáveis.
+O colaborador envia solicitações com Google OAuth; o financeiro acompanha, aprova ou rejeita no painel admin. Há notificação opcional ao colaborador via `mailto:`. Ao **enviar** uma solicitação, o servidor manda automaticamente a planilha e os comprovantes para `FINANCE_EMAIL` (Resend).
 
 ---
 
@@ -41,7 +41,7 @@ O acesso admin é definido **no servidor** (variável `ADMIN_EMAILS` no Railway)
 
 ## 3. Acesso e segurança
 
-- **Autenticação:** Google OAuth (conta Google do colaborador).
+- **Autenticação:** Google OAuth. Sem restrição de domínio no código. O app OAuth está **Interno** na mesma organização Workspace; o rename `@pxcreativelab.com` → `@luria.ai` não exige mudança de login. Atualize `ADMIN_EMAILS` no Railway no dia da troca (comparação exata de e-mail).
 - **Sessão:** cookie HTTP-only no servidor (`reembolso.sid`), 7 dias.
 - **Mobile:** login via redirect do Google (sem popup); API acessada pelo mesmo domínio da Vercel (proxy), para sessão funcionar no iPhone/Android.
 - **Isolamento:** cada colaborador vê só seus reembolsos; admin vê todos.

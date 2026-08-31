@@ -36,7 +36,10 @@ Esse valor é o que você coloca na Vercel como **`VITE_API_BASE_URL`** (sem bar
    | `GOOGLE_CLIENT_ID` | Igual ao `VITE_GOOGLE_CLIENT_ID` |
    | `SESSION_SECRET` | String longa aleatória |
    | `CLIENT_ORIGIN` | `https://seu-app.vercel.app` |
-   | `ADMIN_EMAILS` | `email1@...,email2@...` |
+   | `ADMIN_EMAILS` | `email1@...,email2@...` (no rename do Workspace, atualizar para `@luria.ai`) |
+   | `FINANCE_EMAIL` | `financeiro@pxdata.ai` |
+   | `RESEND_API_KEY` | Chave Resend |
+   | `RESEND_FROM` | Remetente verificado no Resend |
    | `TRUST_CROSS_SITE_SESSION` | `1` |
 
 5. **Deploy** e copie a URL pública do serviço → use na Vercel em `VITE_API_BASE_URL`.

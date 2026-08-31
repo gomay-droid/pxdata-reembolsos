@@ -36,10 +36,15 @@ const PORT = Number(process.env.PORT) || 3001;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? "";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "dev-only-mude-em-producao";
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((s) => s.trim().toLowerCase())
-  .filter(Boolean);
+function parseCsvList(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const ADMIN_EMAILS = parseCsvList(process.env.ADMIN_EMAILS);
+const FINANCE_EMAIL = (process.env.FINANCE_EMAIL ?? "").trim().toLowerCase();
 
 /** Front na Vercel + API em outro domínio: cookie de sessão precisa SameSite=None + Secure. */
 const TRUST_CROSS_SITE_SESSION =
@@ -413,6 +418,89 @@ function parseDbIdFromPublicId(publicId: string): number | null {
   return parseInt(m[1], 10);
 }
 
+function sendXlsxDownload(res: express.Response, buffer: Buffer, filename: string) {
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Length", String(buffer.length));
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.end(buffer);
+}
+
+async function buildSpreadsheetForDbId(dbId: number) {
+  await ensureCompanySettings();
+  const [reimbursement, company] = await Promise.all([
+    prisma.reimbursement.findUnique({
+      where: { id: dbId },
+      include: {
+        expenses: { orderBy: { id: "asc" } },
+        attachments: { orderBy: { id: "asc" } },
+      },
+    }),
+    prisma.companySettings.findUnique({ where: { id: 1 } }),
+  ]);
+  if (!reimbursement) return { error: "not_found" as const };
+  if (!company) return { error: "no_company" as const };
+
+  const { buildReimbursementSpreadsheetBuffer, reimbursementSpreadsheetFilename } = await import(
+    "./exportExpenseSpreadsheet.js"
+  );
+  const publicId = formatReimbursementId(reimbursement.id);
+  const buffer = await buildReimbursementSpreadsheetBuffer({
+    reimbursementId: publicId,
+    createdAt: reimbursement.createdAt,
+    requesterName: reimbursement.requesterName,
+    requesterAddress: reimbursement.requesterAddress,
+    requesterDocument: reimbursement.requesterDocument,
+    requesterEmail: reimbursement.requesterEmail,
+    company: {
+      name: company.name,
+      address: company.address,
+      cnpj: company.cnpj,
+      email: company.email,
+    },
+    expenses: reimbursement.expenses.map((e) => ({
+      description: e.description,
+      expenseLine: e.expenseLine,
+      accountCode: e.accountCode,
+      amount: e.amount,
+    })),
+  });
+  return {
+    error: null as null,
+    reimbursement,
+    publicId,
+    buffer,
+    filename: reimbursementSpreadsheetFilename(publicId),
+  };
+}
+
+async function sendReimbursementToFinance(dbId: number): Promise<void> {
+  const pack = await buildSpreadsheetForDbId(dbId);
+  if (pack.error === "not_found") throw new Error("Reembolso não encontrado");
+  if (pack.error === "no_company") throw new Error("Dados da empresa não configurados");
+  if (!FINANCE_EMAIL) {
+    throw new Error("Nenhum destinatário do financeiro configurado (FINANCE_EMAIL).");
+  }
+
+  const { sendFinanceReimbursementEmail } = await import("./sendFinanceEmail.js");
+  await sendFinanceReimbursementEmail({
+    to: FINANCE_EMAIL,
+    reimbursementId: pack.publicId,
+    requesterName: pack.reimbursement.requesterName,
+    requesterEmail: pack.reimbursement.requesterEmail,
+    totalAmount: pack.reimbursement.totalAmount,
+    spreadsheetFilename: pack.filename,
+    spreadsheetBuffer: pack.buffer,
+    receipts: pack.reimbursement.attachments.map((a) => ({
+      originalName: a.originalName,
+      storedPath: a.storedPath,
+      mimeType: a.mimeType,
+    })),
+    rootDir,
+    publicBaseUrl: PRIMARY_CLIENT_ORIGIN,
+  });
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, uploadsDir);
@@ -618,6 +706,12 @@ app.post(
         }
       }
 
+      try {
+        await sendReimbursementToFinance(created.id);
+      } catch (mailErr) {
+        console.error("[reimbursements] e-mail ao financeiro após envio:", mailErr);
+      }
+
       res.status(201).json({
         id: formatReimbursementId(created.id),
         totalAmount: created.totalAmount,
@@ -721,55 +815,39 @@ app.get("/api/admin/reimbursements/:id/spreadsheet", requireAuth, requireAdmin, 
     return res.status(400).json({ error: "ID inválido" });
   }
   try {
-    await ensureCompanySettings();
-    const [reimbursement, company] = await Promise.all([
-      prisma.reimbursement.findUnique({
-        where: { id: dbId },
-        include: { expenses: { orderBy: { id: "asc" } } },
-      }),
-      prisma.companySettings.findUnique({ where: { id: 1 } }),
-    ]);
-    if (!reimbursement) return res.status(404).json({ error: "Reembolso não encontrado" });
-    if (!company) return res.status(500).json({ error: "Dados da empresa não configurados" });
-
-    const { buildReimbursementSpreadsheetBuffer, reimbursementSpreadsheetFilename } = await import(
-      "./exportExpenseSpreadsheet.js"
-    );
-    const publicId = formatReimbursementId(reimbursement.id);
-    const buffer = await buildReimbursementSpreadsheetBuffer({
-      reimbursementId: publicId,
-      createdAt: reimbursement.createdAt,
-      requesterName: reimbursement.requesterName,
-      requesterAddress: reimbursement.requesterAddress,
-      requesterDocument: reimbursement.requesterDocument,
-      requesterEmail: reimbursement.requesterEmail,
-      company: {
-        name: company.name,
-        address: company.address,
-        cnpj: company.cnpj,
-        email: company.email,
-      },
-      expenses: reimbursement.expenses.map((e) => ({
-        description: e.description,
-        expenseLine: e.expenseLine,
-        accountCode: e.accountCode,
-        amount: e.amount,
-      })),
-    });
-
-    const filename = reimbursementSpreadsheetFilename(publicId);
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(buffer);
+    const pack = await buildSpreadsheetForDbId(dbId);
+    if (pack.error === "not_found") return res.status(404).json({ error: "Reembolso não encontrado" });
+    if (pack.error === "no_company") {
+      return res.status(500).json({ error: "Dados da empresa não configurados" });
+    }
+    sendXlsxDownload(res, pack.buffer, pack.filename);
   } catch (e) {
     console.error("[admin/spreadsheet]", e);
     const msg = e instanceof Error ? e.message : "Erro ao gerar planilha";
     res.status(500).json({ error: msg });
   }
 });
+
+app.post(
+  "/api/admin/reimbursements/:id/send-to-finance",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const dbId = parseDbIdFromPublicId(req.params.id);
+    if (dbId === null) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    try {
+      await sendReimbursementToFinance(dbId);
+      res.json({ ok: true, to: [FINANCE_EMAIL] });
+    } catch (e) {
+      console.error("[admin/send-to-finance]", e);
+      const msg = e instanceof Error ? e.message : "Erro ao enviar e-mail ao financeiro";
+      const status = /não configurado|Nenhum destinatário/i.test(msg) ? 503 : 500;
+      res.status(status).json({ error: msg });
+    }
+  }
+);
 
 app.get("/api/admin/metrics", requireAuth, requireAdmin, async (_req, res) => {
   try {
