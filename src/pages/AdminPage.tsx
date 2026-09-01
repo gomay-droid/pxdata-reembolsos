@@ -39,7 +39,7 @@ import type { CompanyProfile } from "@/types/company";
 import { ReimbursementStatusFilter } from "@/components/reimbursement/ReimbursementStatusFilter";
 import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
 import { bankAccountTypeLabel, isBankDataPlaceholder } from "@/lib/bankDetails";
-import { fetchIsAdmin } from "@/lib/fetchIsAdmin";
+import { fetchIsAdmin, fetchWithRetry, isAbortError } from "@/lib/fetchIsAdmin";
 
 type AdminTab = "despesas" | "dashboard" | "empresa";
 
@@ -113,6 +113,7 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | ReimbursementStatus>("all");
   const [loadingExpenses, setLoadingExpenses] = useState(false);
   const [expensesLoaded, setExpensesLoaded] = useState(false);
+  const [expensesLoadError, setExpensesLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<AdminReimbursementDetails | null>(null);
   const [loadingSelected, setLoadingSelected] = useState(false);
   const [expenseEmailModal, setExpenseEmailModal] = useState<{
@@ -238,28 +239,45 @@ export default function AdminPage() {
     }
   }, []);
 
+  const expensesAbortRef = useRef<AbortController | null>(null);
+
   const loadExpenses = useCallback(async () => {
+    expensesAbortRef.current?.abort();
+    const ac = new AbortController();
+    expensesAbortRef.current = ac;
     setLoadingExpenses(true);
+    setExpensesLoadError(null);
     try {
       const query = statusFilter === "all" ? "" : `?status=${encodeURIComponent(statusFilter)}`;
-      const res = await fetch(apiUrl(`/api/admin/reimbursements${query}`), {
-        credentials: "include",
+      const res = await fetchWithRetry(`/api/admin/reimbursements${query}`, {
         cache: "no-store",
+        signal: ac.signal,
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         setReimbursements([]);
-        toast.error(data.error ?? "Não foi possível carregar todos os reembolsos");
+        const message =
+          data.error ??
+          (res.status === 401
+            ? "Sessão expirada. Entre de novo e abra Administração."
+            : "Não foi possível carregar todos os reembolsos");
+        setExpensesLoadError(message);
+        toast.error(message, { id: "admin-reimbursements" });
         return;
       }
       const data = (await res.json()) as Reimbursement[];
       setReimbursements(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (error) {
+      if (isAbortError(error) || ac.signal.aborted) return;
       setReimbursements([]);
-      toast.error("Falha de rede ao carregar reembolsos do admin");
+      const message = "Falha de rede ao carregar reembolsos do admin";
+      setExpensesLoadError(message);
+      toast.error(message, { id: "admin-reimbursements" });
     } finally {
-      setLoadingExpenses(false);
-      setExpensesLoaded(true);
+      if (!ac.signal.aborted) {
+        setLoadingExpenses(false);
+        setExpensesLoaded(true);
+      }
     }
   }, [statusFilter]);
 
@@ -572,6 +590,14 @@ export default function AdminPage() {
             {loadingExpenses ? (
               <div className="flex justify-center py-12 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : expensesLoadError ? (
+              <div className="rounded-2xl border border-border bg-card p-8 text-center space-y-4">
+                <p className="text-sm text-muted-foreground">{expensesLoadError}</p>
+                <Button type="button" variant="secondary" className="gap-2" onClick={() => void loadExpenses()}>
+                  <RefreshCw className="h-4 w-4" />
+                  Tentar novamente
+                </Button>
               </div>
             ) : (
               <ReimbursementList
