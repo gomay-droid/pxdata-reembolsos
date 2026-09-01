@@ -233,7 +233,6 @@ app.get("/api/auth/me", (req, res) => {
 app.get("/api/auth/is-admin", requireAuth, (req, res) => {
   const email = req.session.user?.email?.trim().toLowerCase();
   const isAdmin = Boolean(email && ADMIN_EMAILS.includes(email));
-  console.log(`[is-admin][debug] sessionEmail=${JSON.stringify(email)} adminList=${JSON.stringify(ADMIN_EMAILS)} isAdmin=${isAdmin}`);
   res.json({ isAdmin });
 });
 

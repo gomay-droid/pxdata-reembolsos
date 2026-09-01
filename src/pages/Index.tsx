@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogoMark } from "@/components/BrandLogoMark";
 import { apiUrl } from "@/lib/apiBase";
+import { fetchIsAdmin } from "@/lib/fetchIsAdmin";
 import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
 
 type View = "form" | "list";
@@ -85,17 +86,7 @@ const Index = () => {
   useEffect(() => {
     if (!user) return;
     void (async () => {
-      try {
-        const res = await fetch(apiUrl("/api/auth/is-admin"), { credentials: "include" });
-        if (!res.ok) {
-          setIsAdmin(false);
-          return;
-        }
-        const data = (await res.json()) as { isAdmin: boolean };
-        setIsAdmin(Boolean(data.isAdmin));
-      } catch {
-        setIsAdmin(false);
-      }
+      setIsAdmin(await fetchIsAdmin());
     })();
   }, [user]);
 

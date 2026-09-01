@@ -39,6 +39,7 @@ import type { CompanyProfile } from "@/types/company";
 import { ReimbursementStatusFilter } from "@/components/reimbursement/ReimbursementStatusFilter";
 import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
 import { bankAccountTypeLabel, isBankDataPlaceholder } from "@/lib/bankDetails";
+import { fetchIsAdmin } from "@/lib/fetchIsAdmin";
 
 type AdminTab = "despesas" | "dashboard" | "empresa";
 
@@ -228,21 +229,9 @@ export default function AdminPage() {
 
   const loadIsAdmin = useCallback(async () => {
     setAdminLoading(true);
-    console.log("[admin][debug] loadIsAdmin: start");
     try {
-      const res = await fetch(apiUrl("/api/auth/is-admin"), { credentials: "include" });
-      console.log("[admin][debug] loadIsAdmin: response", res.status, res.ok, res.headers.get("content-type"));
-      if (!res.ok) {
-        setIsAdmin(false);
-        return;
-      }
-      const raw = await res.text();
-      console.log("[admin][debug] loadIsAdmin: raw body", raw);
-      const data = JSON.parse(raw) as { isAdmin: boolean };
-      console.log("[admin][debug] loadIsAdmin: parsed isAdmin=", Boolean(data.isAdmin));
-      setIsAdmin(Boolean(data.isAdmin));
-    } catch (e) {
-      console.log("[admin][debug] loadIsAdmin: CATCH", e && e.name, e && e.message, String(e));
+      setIsAdmin(await fetchIsAdmin());
+    } catch {
       setIsAdmin(false);
     } finally {
       setAdminLoading(false);
@@ -399,7 +388,6 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (user) {
-    console.log("[admin][debug] effect fired, user=", user ? user.email : null);
       void loadIsAdmin();
     }
   }, [user, loadIsAdmin]);
@@ -463,6 +451,15 @@ export default function AdminPage() {
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <Button type="button" onClick={() => navigate("/")} className="gap-2">
               Voltar
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void loadIsAdmin()}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
             </Button>
             <Button type="button" variant="ghost" onClick={() => void logout()} className="gap-2">
               <X className="h-4 w-4" />
