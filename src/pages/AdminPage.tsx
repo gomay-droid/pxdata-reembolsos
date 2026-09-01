@@ -40,6 +40,7 @@ import { ReimbursementStatusFilter } from "@/components/reimbursement/Reimbursem
 import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
 import { bankAccountTypeLabel, isBankDataPlaceholder } from "@/lib/bankDetails";
 import { fetchIsAdmin, fetchWithRetry, isAbortError } from "@/lib/fetchIsAdmin";
+import { apiUrl, assetUrl } from "@/lib/apiBase";
 
 type AdminTab = "despesas" | "dashboard" | "empresa";
 
@@ -284,15 +285,15 @@ export default function AdminPage() {
   const openDetails = useCallback(async (r: Reimbursement) => {
     setLoadingSelected(true);
     try {
-      const res = await fetch(apiUrl(`/api/admin/reimbursements/${encodeURIComponent(r.id)}`), {
-        credentials: "include",
-      });
+      const res = await fetchWithRetry(`/api/admin/reimbursements/${encodeURIComponent(r.id)}`);
       const data = (await res.json().catch(() => ({}))) as AdminReimbursementDetails & { error?: string };
       if (!res.ok) {
         toast.error(data.error ?? "Não foi possível carregar os detalhes");
         return;
       }
       setSelected(data);
+    } catch {
+      toast.error("Falha de rede ao carregar os detalhes");
     } finally {
       setLoadingSelected(false);
     }
