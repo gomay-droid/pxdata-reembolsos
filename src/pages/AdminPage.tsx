@@ -241,8 +241,8 @@ export default function AdminPage() {
       const data = JSON.parse(raw) as { isAdmin: boolean };
       console.log("[admin][debug] loadIsAdmin: parsed isAdmin=", Boolean(data.isAdmin));
       setIsAdmin(Boolean(data.isAdmin));
-    } catch {
-      console.log("[admin][debug] loadIsAdmin: CATCH");
+    } catch (e) {
+      console.log("[admin][debug] loadIsAdmin: CATCH", e && e.name, e && e.message, String(e));
       setIsAdmin(false);
     } finally {
       setAdminLoading(false);
