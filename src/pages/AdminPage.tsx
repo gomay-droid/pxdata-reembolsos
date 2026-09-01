@@ -61,6 +61,7 @@ type AdminReimbursementDetails = {
   bankAccount?: string;
   bankAccountType?: string;
   bankAccountHolder?: string;
+  pixKey?: string;
   status: Reimbursement["status"];
   totalAmount: number;
   createdAt: string;
@@ -664,17 +665,27 @@ export default function AdminPage() {
 
               <div
                 className={`rounded-2xl border p-4 space-y-3 ${
-                  [selected.bankName, selected.bankAgency, selected.bankAccount, selected.bankAccountType, selected.bankAccountHolder].some(
-                    (v) => isBankDataPlaceholder(v)
-                  )
+                  [
+                    selected.bankName,
+                    selected.bankAgency,
+                    selected.bankAccount,
+                    selected.bankAccountType,
+                    selected.bankAccountHolder,
+                    selected.pixKey,
+                  ].some((v) => isBankDataPlaceholder(v))
                     ? "border-amber-500/40 bg-amber-500/5"
                     : "border-border bg-background"
                 }`}
               >
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Dados bancários</p>
-                {[selected.bankName, selected.bankAgency, selected.bankAccount, selected.bankAccountType, selected.bankAccountHolder].some(
-                  (v) => isBankDataPlaceholder(v)
-                ) && (
+                {[
+                  selected.bankName,
+                  selected.bankAgency,
+                  selected.bankAccount,
+                  selected.bankAccountType,
+                  selected.bankAccountHolder,
+                  selected.pixKey,
+                ].some((v) => isBankDataPlaceholder(v)) && (
                   <p className="text-xs text-amber-800 dark:text-amber-200">
                     Dado não informado nesta solicitação antiga — confirmar por fora do sistema.
                   </p>
@@ -696,9 +707,13 @@ export default function AdminPage() {
                     <span className="text-muted-foreground">Tipo: </span>
                     {bankAccountTypeLabel(selected.bankAccountType)}
                   </p>
-                  <p className="sm:col-span-2">
+                  <p>
                     <span className="text-muted-foreground">Titular: </span>
                     {selected.bankAccountHolder ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Chave PIX: </span>
+                    {selected.pixKey ?? "—"}
                   </p>
                 </div>
               </div>
@@ -762,10 +777,19 @@ export default function AdminPage() {
                               {e.expenseLine}
                               {e.accountCode ? ` · ${e.accountCode}` : ""}
                             </p>
-                            {e.observation?.trim() && (
-                              <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">
-                                <span className="font-medium text-foreground/80">Observação: </span>
-                                {e.observation.trim()}
+                            {(e.observation?.trim() || isBankDataPlaceholder(e.observation)) && (
+                              <p
+                                className={`text-xs mt-2 whitespace-pre-wrap ${
+                                  isBankDataPlaceholder(e.observation)
+                                    ? "text-amber-800 dark:text-amber-200"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                <span className="font-medium text-foreground/80">Motivo: </span>
+                                {e.observation?.trim() || "não informado"}
+                                {isBankDataPlaceholder(e.observation)
+                                  ? " — confirmar por fora do sistema."
+                                  : ""}
                               </p>
                             )}
                           </div>

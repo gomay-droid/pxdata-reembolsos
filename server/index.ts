@@ -459,6 +459,7 @@ async function buildSpreadsheetForDbId(dbId: number) {
     bankAccount: reimbursement.bankAccount,
     bankAccountType: reimbursement.bankAccountType,
     bankAccountHolder: reimbursement.bankAccountHolder,
+    pixKey: reimbursement.pixKey,
     company: {
       name: company.name,
       address: company.address,
@@ -565,6 +566,7 @@ type PayloadBody = {
   bankAccount: string;
   bankAccountType: string;
   bankAccountHolder: string;
+  pixKey: string;
   expenses: PayloadExpense[];
 };
 
@@ -633,6 +635,7 @@ app.post(
       requireBankField(payload.bankAgency, "Agência"),
       requireBankField(payload.bankAccount, "Conta"),
       requireBankField(payload.bankAccountHolder, "Titular da conta"),
+      requireBankField(payload.pixKey, "Chave PIX"),
     ].filter(Boolean);
     if (bankErrors.length > 0) {
       return res.status(400).json({ error: bankErrors[0] });
@@ -666,6 +669,10 @@ app.post(
       if (!e.description?.trim() || !e.expenseLine) {
         return res.status(400).json({ error: "Cada despesa precisa de descrição e linha" });
       }
+      const motivo = String(e.observation ?? "").trim();
+      if (!motivo || motivo.toLowerCase() === BANK_DATA_PLACEHOLDER) {
+        return res.status(400).json({ error: "Descreva o motivo da sua solicitação em cada despesa" });
+      }
       const amt = typeof e.amount === "string" ? parseFloat(e.amount) : e.amount;
       if (!amt || amt <= 0) {
         return res.status(400).json({ error: "Valor de despesa inválido" });
@@ -690,6 +697,7 @@ app.post(
           bankAccount: payload.bankAccount.trim(),
           bankAccountType,
           bankAccountHolder: payload.bankAccountHolder.trim(),
+          pixKey: payload.pixKey.trim(),
           totalAmount,
           expenses: {
             create: payload.expenses.map((e) => ({
@@ -698,7 +706,7 @@ app.post(
               accountCode: e.accountCode?.trim() || null,
               amount:
                 typeof e.amount === "string" ? parseFloat(e.amount) : Number(e.amount),
-              observation: e.observation?.trim() || null,
+              observation: e.observation?.trim() || BANK_DATA_PLACEHOLDER,
               odometerStart:
                 typeof e.odometerStart === "number" && Number.isFinite(e.odometerStart)
                   ? e.odometerStart
@@ -847,6 +855,7 @@ app.get("/api/admin/reimbursements/:id", requireAuth, requireAdmin, async (req, 
       bankAccount: r.bankAccount,
       bankAccountType: r.bankAccountType,
       bankAccountHolder: r.bankAccountHolder,
+      pixKey: r.pixKey,
       status: r.status,
       totalAmount: r.totalAmount,
       createdAt: r.createdAt.toISOString(),

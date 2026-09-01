@@ -1,4 +1,5 @@
 import type { Expense } from "@/types/reimbursement";
+import { isBankDataPlaceholder } from "@/lib/bankDetails";
 
 export function isPlaceholderExpense(e: Expense): boolean {
   return (
@@ -42,6 +43,7 @@ const VALIDATION_LABELS: Record<string, string> = {
   bankAccount: "Conta",
   bankAccountType: "Tipo de conta",
   bankAccountHolder: "Titular da conta",
+  pixKey: "Chave PIX",
   expenses_empty: "Pelo menos uma despesa",
 };
 
@@ -52,6 +54,7 @@ const EXPENSE_FIELD_LABELS: Record<string, string> = {
   supplierCnpj: "CNPJ do fornecedor",
   attachments: "comprovante anexado",
   processing: "processamento do comprovante",
+  observation: "motivo da solicitação",
 };
 
 export function validationErrorLabel(key: string): string {
@@ -88,6 +91,10 @@ export function validateExpenseItemFields(e: Expense): Record<string, string> {
   }
   if (!e.expenseLine) {
     newErrors[`expense_${e.id}_expenseLine`] = "Selecione a linha de despesa.";
+  }
+  const motivo = e.observation?.trim() ?? "";
+  if (!motivo || isBankDataPlaceholder(motivo)) {
+    newErrors[`expense_${e.id}_observation`] = "Descreva o motivo da sua solicitação.";
   }
   const amount = parseExpenseAmount(e.amount);
   if (!e.amount.trim() || !Number.isFinite(amount) || amount <= 0) {

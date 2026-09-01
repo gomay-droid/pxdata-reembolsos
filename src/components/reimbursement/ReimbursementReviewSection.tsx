@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FuelExpenseFields } from "@/components/reimbursement/FuelExpenseFields";
 import { BANK_ACCOUNT_TYPES } from "@/lib/bankDetails";
+import { AlertTriangle, ClipboardCheck, DollarSign, FileText } from "lucide-react";
 
 interface Props {
   expenses: Expense[];
@@ -19,6 +20,7 @@ interface Props {
   bankAccount: string;
   bankAccountType: string;
   bankAccountHolder: string;
+  pixKey: string;
   errors: Record<string, string>;
   totalAmount: number;
   expenseLineOptions: string[];
@@ -44,6 +46,7 @@ export function ReimbursementReviewSection({
   bankAccount,
   bankAccountType,
   bankAccountHolder,
+  pixKey,
   errors,
   totalAmount,
   expenseLineOptions,
@@ -66,7 +69,8 @@ export function ReimbursementReviewSection({
     Boolean(errors.bankAgency) ||
     Boolean(errors.bankAccount) ||
     Boolean(errors.bankAccountType) ||
-    Boolean(errors.bankAccountHolder);
+    Boolean(errors.bankAccountHolder) ||
+    Boolean(errors.pixKey);
 
   return (
     <div className={className ?? "rounded-2xl border border-border bg-card p-6 md:p-8 space-y-5"}>
@@ -184,6 +188,15 @@ export function ReimbursementReviewSection({
             {errors.bankAccountHolder && (
               <p className="text-xs text-destructive">{errors.bankAccountHolder}</p>
             )}
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label className="text-sm text-muted-foreground">Chave PIX *</Label>
+            <Input
+              value={pixKey}
+              onChange={(e) => onRequesterUpdate("pixKey", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.pixKey && <p className="text-xs text-destructive">{errors.pixKey}</p>}
           </div>
         </div>
       </div>
@@ -320,14 +333,21 @@ export function ReimbursementReviewSection({
               )}
 
               <div className="space-y-2 md:col-span-2">
-                <Label className="text-sm text-muted-foreground">Observação (opcional)</Label>
+                <Label className="text-sm text-muted-foreground">
+                  Descreva o motivo da sua solicitação *
+                </Label>
                 <textarea
                   value={expense.observation ?? ""}
                   onChange={(e) => onUpdate(expense.id, "observation", e.target.value)}
-                  placeholder="Informações adicionais sobre esta despesa…"
+                  placeholder="Por que esta despesa foi necessária?"
                   rows={3}
                   className="flex w-full rounded-2xl border border-input bg-card px-4 py-3 font-light ring-offset-background placeholder:text-muted-foreground transition-colors duration-300 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-foreground/25 resize-y min-h-[5rem]"
                 />
+                {errors[`expense_${expense.id}_observation`] && (
+                  <p className="text-xs text-destructive">
+                    {errors[`expense_${expense.id}_observation`]}
+                  </p>
+                )}
               </div>
 
               {expense.attachments.length > 0 && (

@@ -33,6 +33,7 @@ model Reimbursement {
   bankAccount       String       @default("não informado")
   bankAccountType   String       @default("não informado")
   bankAccountHolder String       @default("não informado")
+  pixKey            String       @default("não informado")
   status            String       @default("enviado")
   totalAmount       Float
   createdAt         DateTime     @default(now())

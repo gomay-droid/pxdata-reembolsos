@@ -30,6 +30,7 @@ export type ReimbursementSpreadsheetInput = {
   bankAccount: string;
   bankAccountType: string;
   bankAccountHolder: string;
+  pixKey: string;
   company: {
     name: string;
     address: string;
@@ -193,6 +194,7 @@ export async function buildReimbursementSpreadsheetBuffer(
       bankAccount: input.bankAccount,
       bankAccountType: input.bankAccountType,
       bankAccountHolder: input.bankAccountHolder,
+      pixKey: input.pixKey,
     })
   );
 

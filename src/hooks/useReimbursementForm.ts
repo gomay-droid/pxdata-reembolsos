@@ -6,6 +6,7 @@ import {
   primaryAttachmentName,
   validateExpenseItemFields,
 } from "@/lib/expenseAmount";
+import { isBankDataPlaceholder } from "@/lib/bankDetails";
 import {
   accountCodeForInferredLine,
   inferExpenseLineFromText,
@@ -108,6 +109,7 @@ export function useReimbursementForm() {
     bankAccount: "",
     bankAccountType: "",
     bankAccountHolder: "",
+    pixKey: "",
     expenses: [createEmptyExpense(1)],
   });
 
@@ -455,12 +457,23 @@ export function useReimbursementForm() {
     if (!formData.requesterName.trim()) newErrors.requesterName = "Nome é obrigatório";
     if (!formData.requesterEmail.trim()) newErrors.requesterEmail = "Email é obrigatório";
     if (!formData.requesterDocument.trim()) newErrors.requesterDocument = "CPF/CNPJ é obrigatório";
-    if (!formData.bankName.trim()) newErrors.bankName = "Banco é obrigatório";
-    if (!formData.bankAgency.trim()) newErrors.bankAgency = "Agência é obrigatória";
-    if (!formData.bankAccount.trim()) newErrors.bankAccount = "Conta é obrigatória";
-    if (!formData.bankAccountType.trim()) newErrors.bankAccountType = "Tipo de conta é obrigatório";
-    if (!formData.bankAccountHolder.trim()) {
+    if (!formData.bankName.trim() || isBankDataPlaceholder(formData.bankName)) {
+      newErrors.bankName = "Banco é obrigatório";
+    }
+    if (!formData.bankAgency.trim() || isBankDataPlaceholder(formData.bankAgency)) {
+      newErrors.bankAgency = "Agência é obrigatória";
+    }
+    if (!formData.bankAccount.trim() || isBankDataPlaceholder(formData.bankAccount)) {
+      newErrors.bankAccount = "Conta é obrigatória";
+    }
+    if (!formData.bankAccountType.trim() || isBankDataPlaceholder(formData.bankAccountType)) {
+      newErrors.bankAccountType = "Tipo de conta é obrigatório";
+    }
+    if (!formData.bankAccountHolder.trim() || isBankDataPlaceholder(formData.bankAccountHolder)) {
       newErrors.bankAccountHolder = "Titular da conta é obrigatório";
+    }
+    if (!formData.pixKey.trim() || isBankDataPlaceholder(formData.pixKey)) {
+      newErrors.pixKey = "Chave PIX é obrigatória";
     }
 
     const activeExpenses = formData.expenses.filter((e) => !isPlaceholderExpense(e));
@@ -501,6 +514,7 @@ export function useReimbursementForm() {
       bankAccount: "",
       bankAccountType: "",
       bankAccountHolder: "",
+      pixKey: "",
       expenses: [createEmptyExpense(1)],
     });
     setErrors({});

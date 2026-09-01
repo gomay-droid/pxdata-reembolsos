@@ -23,6 +23,7 @@ interface Props {
   bankAccount: string;
   bankAccountType: string;
   bankAccountHolder: string;
+  pixKey: string;
   errors: Record<string, string>;
   onUpdate: (field: RequesterField, value: string) => void;
 }
@@ -37,6 +38,7 @@ export function RequesterSection({
   bankAccount,
   bankAccountType,
   bankAccountHolder,
+  pixKey,
   errors,
   onUpdate,
 }: Props) {
@@ -189,6 +191,19 @@ export function RequesterSection({
           {errors.bankAccountHolder && (
             <p className="text-xs text-destructive">{errors.bankAccountHolder}</p>
           )}
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="pixKey" className="text-sm text-muted-foreground">
+            Chave PIX *
+          </Label>
+          <Input
+            id="pixKey"
+            value={pixKey}
+            onChange={(e) => onUpdate("pixKey", e.target.value)}
+            placeholder="CPF, e-mail, telefone ou chave aleatória"
+            className="bg-secondary border-border font-light"
+          />
+          {errors.pixKey && <p className="text-xs text-destructive">{errors.pixKey}</p>}
         </div>
       </div>
     </div>

@@ -22,18 +22,21 @@ export function formatBankDetailsLine(input: {
   bankAccount: string;
   bankAccountType: string;
   bankAccountHolder: string;
+  pixKey: string;
 }): string {
   const missing =
     isBankDataPlaceholder(input.bankName) ||
     isBankDataPlaceholder(input.bankAgency) ||
     isBankDataPlaceholder(input.bankAccount) ||
     isBankDataPlaceholder(input.bankAccountType) ||
-    isBankDataPlaceholder(input.bankAccountHolder);
+    isBankDataPlaceholder(input.bankAccountHolder) ||
+    isBankDataPlaceholder(input.pixKey);
   const body = [
     `Banco: ${input.bankName.trim() || BANK_DATA_PLACEHOLDER}`,
     `Agência: ${input.bankAgency.trim() || BANK_DATA_PLACEHOLDER}`,
     `Conta: ${input.bankAccount.trim() || BANK_DATA_PLACEHOLDER} (${bankAccountTypeLabel(input.bankAccountType)})`,
     `Titular: ${input.bankAccountHolder.trim() || BANK_DATA_PLACEHOLDER}`,
+    `PIX: ${input.pixKey.trim() || BANK_DATA_PLACEHOLDER}`,
   ].join(" | ");
   return missing ? `CONFIRMAR FORA DO SISTEMA — ${body}` : body;
 }

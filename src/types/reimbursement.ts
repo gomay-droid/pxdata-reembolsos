@@ -17,7 +17,7 @@ export interface Expense {
   supplierCnpjConfirmed?: boolean;
   /** Comprovantes desta linha (enviados no FormData na ordem das despesas). */
   attachments: File[];
-  /** Informações adicionais sobre a despesa (opcional). */
+  /** Motivo da despesa (obrigatório no envio). */
   observation?: string;
   /** Odômetro inicial (km) — apenas COMBUSTÍVEL. */
   odometerStart?: string;
@@ -65,6 +65,7 @@ export interface ReimbursementFormData {
   bankAccount: string;
   bankAccountType: string;
   bankAccountHolder: string;
+  pixKey: string;
   expenses: Expense[];
 }
 

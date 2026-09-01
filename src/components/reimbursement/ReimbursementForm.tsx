@@ -108,6 +108,7 @@ export default function ReimbursementForm({
       bankAccount: formData.bankAccount,
       bankAccountType: formData.bankAccountType,
       bankAccountHolder: formData.bankAccountHolder,
+      pixKey: formData.pixKey,
       expenses: active.map(
         ({
           description,
@@ -215,6 +216,7 @@ export default function ReimbursementForm({
           bankAccount={formData.bankAccount}
           bankAccountType={formData.bankAccountType}
           bankAccountHolder={formData.bankAccountHolder}
+          pixKey={formData.pixKey}
           errors={errors}
           onUpdate={updateField}
         />
@@ -304,6 +306,7 @@ export default function ReimbursementForm({
                 bankAccount={formData.bankAccount}
                 bankAccountType={formData.bankAccountType}
                 bankAccountHolder={formData.bankAccountHolder}
+                pixKey={formData.pixKey}
                 errors={errors}
                 totalAmount={totalAmount}
                 expenseLineOptions={expenseLineOptions}
