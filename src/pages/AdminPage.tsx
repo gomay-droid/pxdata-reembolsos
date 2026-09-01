@@ -228,15 +228,21 @@ export default function AdminPage() {
 
   const loadIsAdmin = useCallback(async () => {
     setAdminLoading(true);
+    console.log("[admin][debug] loadIsAdmin: start");
     try {
       const res = await fetch(apiUrl("/api/auth/is-admin"), { credentials: "include" });
+      console.log("[admin][debug] loadIsAdmin: response", res.status, res.ok, res.headers.get("content-type"));
       if (!res.ok) {
         setIsAdmin(false);
         return;
       }
-      const data = (await res.json()) as { isAdmin: boolean };
+      const raw = await res.text();
+      console.log("[admin][debug] loadIsAdmin: raw body", raw);
+      const data = JSON.parse(raw) as { isAdmin: boolean };
+      console.log("[admin][debug] loadIsAdmin: parsed isAdmin=", Boolean(data.isAdmin));
       setIsAdmin(Boolean(data.isAdmin));
     } catch {
+      console.log("[admin][debug] loadIsAdmin: CATCH");
       setIsAdmin(false);
     } finally {
       setAdminLoading(false);
@@ -393,6 +399,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (user) {
+    console.log("[admin][debug] effect fired, user=", user ? user.email : null);
       void loadIsAdmin();
     }
   }, [user, loadIsAdmin]);
