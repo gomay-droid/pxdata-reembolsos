@@ -70,6 +70,7 @@ interface Props {
       litersFilled?: number | null;
     }
   ) => void;
+  onCnpjConfirmedChange: (id: number, checked: boolean) => void;
 }
 
 export function ExpensesSection({
@@ -88,6 +89,7 @@ export function ExpensesSection({
   addExpensesFromFiles,
   setExpenseProcessingState,
   applyExpenseExtractionResult,
+  onCnpjConfirmedChange,
 }: Props) {
   const [openItems, setOpenItems] = useState<Record<number, boolean>>({});
   const [pdfExtractingId, setPdfExtractingId] = useState<number | null>(null);
@@ -437,6 +439,19 @@ export function ExpensesSection({
                             placeholder="00.000.000/0000-00"
                             className="bg-secondary border-border font-light"
                           />
+                          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(expense.supplierCnpjConfirmed)}
+                              onChange={(e) => onCnpjConfirmedChange(expense.id, e.target.checked)}
+                            />
+                            Confirmo que esta nota não possui CNPJ legível
+                          </label>
+                          {errors[`expense_${expense.id}_supplierCnpj`] && (
+                            <p className="text-xs text-destructive">
+                              {errors[`expense_${expense.id}_supplierCnpj`]}
+                            </p>
+                          )}
                         </div>
 
                         <div className="space-y-2 md:col-span-2">

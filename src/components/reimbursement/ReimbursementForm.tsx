@@ -241,6 +241,7 @@ export default function ReimbursementForm({
           onExpenseLineChange={updateExpenseLine}
           onAddAttachments={addExpenseAttachments}
           onRemoveAttachment={removeExpenseAttachment}
+          onCnpjConfirmedChange={setExpenseCnpjConfirmed}
         />
       </div>
 
