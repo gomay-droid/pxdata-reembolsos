@@ -5,16 +5,17 @@ export type AdminReimbursementDecision = "approve" | "reject" | "contest";
 
 export function apiStatusForDecision(
   decision: AdminReimbursementDecision
-): "aprovado" | "rejeitado" | "enviado" {
+): "aprovado" | "rejeitado" | "contestado" {
   if (decision === "approve") return "aprovado";
   if (decision === "reject") return "rejeitado";
-  return "enviado";
+  return "contestado";
 }
 
 /** Modelo de e-mail alinhado ao status atual do reembolso (para o botão “Notificar por e-mail”). */
 export function expenseEmailKindForReimbursementStatus(status: string): ExpenseEmailKind {
   if (status === "aprovado") return "approve";
   if (status === "rejeitado") return "reject";
+  if (status === "contestado") return "contest";
   return "contest";
 }
 
@@ -25,6 +26,6 @@ export function toastMessageForDecision(decision: AdminReimbursementDecision): s
     case "reject":
       return "Reembolso reprovado. O status foi atualizado.";
     case "contest":
-      return "Solicitação marcada como pendente (contestação).";
+      return "Solicitação marcada como contestada.";
   }
 }

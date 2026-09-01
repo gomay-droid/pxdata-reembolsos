@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import { resolveExpenseAccountCode } from "../src/lib/expenseCatalog.ts";
+import { formatBankDetailsLine } from "../src/lib/bankDetails.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = path.join(__dirname, "templates", "reembolso-nota-debito.xlsx");
@@ -24,6 +25,11 @@ export type ReimbursementSpreadsheetInput = {
   requesterAddress: string | null;
   requesterDocument: string;
   requesterEmail: string;
+  bankName: string;
+  bankAgency: string;
+  bankAccount: string;
+  bankAccountType: string;
+  bankAccountHolder: string;
   company: {
     name: string;
     address: string;
@@ -177,6 +183,18 @@ export async function buildReimbursementSpreadsheetBuffer(
   sheet = setText(sheet, "C9", input.requesterAddress ?? "");
   sheet = setText(sheet, "C10", input.requesterDocument);
   sheet = setText(sheet, "C11", input.requesterEmail);
+  sheet = setText(sheet, "B12", "DADOS BANCÁRIOS");
+  sheet = setText(
+    sheet,
+    "C12",
+    formatBankDetailsLine({
+      bankName: input.bankName,
+      bankAgency: input.bankAgency,
+      bankAccount: input.bankAccount,
+      bankAccountType: input.bankAccountType,
+      bankAccountHolder: input.bankAccountHolder,
+    })
+  );
 
   sheet = setText(sheet, "C13", input.company.name);
   sheet = setText(sheet, "C14", input.company.address);

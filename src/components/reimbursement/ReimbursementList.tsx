@@ -2,7 +2,7 @@ import { Reimbursement } from "@/types/reimbursement";
 import { formatReimbursementDate } from "@/lib/formatLocalDate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, CheckCircle2, XCircle, Clock, Trash2, Loader2 } from "lucide-react";
+import { FileText, CheckCircle2, XCircle, Clock, Trash2, Loader2, MessageSquareWarning } from "lucide-react";
 
 const statusConfig = {
   enviado: { label: "Enviado", icon: Clock, className: "bg-info/10 text-info border-info/20" },
@@ -11,10 +11,10 @@ const statusConfig = {
     icon: CheckCircle2,
     className: "bg-success/10 text-success border-success/20",
   },
-  rejeitado: {
-    label: "Rejeitado",
-    icon: XCircle,
-    className: "bg-destructive/10 text-destructive border-destructive/20",
+  contestado: {
+    label: "Contestado",
+    icon: MessageSquareWarning,
+    className: "bg-violet-500/10 text-violet-800 border-violet-500/20 dark:text-violet-200",
   },
 };
 

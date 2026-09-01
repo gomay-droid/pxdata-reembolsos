@@ -19,10 +19,10 @@ export const REIMBURSEMENT_STATUS_UI: Record<
     barClass: "bg-emerald-500",
     subtleClass: "text-emerald-800 dark:text-emerald-300/90",
   },
-  rejeitado: {
-    label: "Rejeitado",
-    dotClass: "bg-red-500 ring-red-500/30",
-    barClass: "bg-red-500",
-    subtleClass: "text-red-800 dark:text-red-300/90",
+  contestado: {
+    label: "Contestado",
+    dotClass: "bg-violet-400 ring-violet-400/30",
+    barClass: "bg-violet-400",
+    subtleClass: "text-violet-800 dark:text-violet-200/90",
   },
 };

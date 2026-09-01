@@ -11,7 +11,7 @@ import { apiUrl } from "@/lib/apiBase";
 import { expenseLineTotal, formatValidationToast, isPlaceholderExpense } from "@/lib/expenseAmount";
 import { parseFuelNumber } from "@/lib/fuelConsumption";
 import type { CompanyProfile } from "@/types/company";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, X } from "lucide-react";
 
 export interface AuthProfileForForm {
   email: string;
@@ -103,6 +103,11 @@ export default function ReimbursementForm({
       requesterAddress: formData.requesterAddress,
       requesterDocument: formData.requesterDocument,
       requesterEmail: formData.requesterEmail,
+      bankName: formData.bankName,
+      bankAgency: formData.bankAgency,
+      bankAccount: formData.bankAccount,
+      bankAccountType: formData.bankAccountType,
+      bankAccountHolder: formData.bankAccountHolder,
       expenses: active.map(
         ({
           description,
@@ -178,6 +183,11 @@ export default function ReimbursementForm({
       toast.error("Adicione pelo menos uma despesa antes de enviar.");
       return;
     }
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error(formatValidationToast(validationErrors));
+      return;
+    }
     setReviewModalOpen(true);
   };
 
@@ -200,6 +210,11 @@ export default function ReimbursementForm({
           address={formData.requesterAddress}
           document={formData.requesterDocument}
           email={formData.requesterEmail}
+          bankName={formData.bankName}
+          bankAgency={formData.bankAgency}
+          bankAccount={formData.bankAccount}
+          bankAccountType={formData.bankAccountType}
+          bankAccountHolder={formData.bankAccountHolder}
           errors={errors}
           onUpdate={updateField}
         />
@@ -257,11 +272,25 @@ export default function ReimbursementForm({
             className="w-full max-w-5xl max-h-[90dvh] bg-background rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="shrink-0 px-5 md:px-6 py-4 border-b border-border bg-primary/5">
-              <h3 className="text-lg font-medium text-foreground">Revisão final do reembolso</h3>
-              <p className="text-sm text-muted-foreground font-light mt-0.5">
-                Revise os dados antes de confirmar o envio.
-              </p>
+            <div className="shrink-0 px-5 md:px-6 py-4 border-b border-border bg-primary/5 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-lg font-medium text-foreground">Revisão final do reembolso</h3>
+                <p className="text-sm text-muted-foreground font-light mt-0.5">
+                  Revise os dados antes de confirmar o envio.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 shrink-0"
+                disabled={submitting}
+                onClick={() => setReviewModalOpen(false)}
+                aria-label="Fechar revisão"
+                title="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-5 md:p-6">
@@ -270,6 +299,11 @@ export default function ReimbursementForm({
                 requesterName={formData.requesterName}
                 requesterEmail={formData.requesterEmail}
                 requesterDocument={formData.requesterDocument}
+                bankName={formData.bankName}
+                bankAgency={formData.bankAgency}
+                bankAccount={formData.bankAccount}
+                bankAccountType={formData.bankAccountType}
+                bankAccountHolder={formData.bankAccountHolder}
                 errors={errors}
                 totalAmount={totalAmount}
                 expenseLineOptions={expenseLineOptions}
@@ -287,15 +321,7 @@ export default function ReimbursementForm({
             </div>
 
             <div className="shrink-0 px-5 md:px-6 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setReviewModalOpen(false)}
-                  disabled={submitting}
-                >
-                  Voltar e editar
-                </Button>
+              <div className="flex justify-end">
                 <Button
                   type="button"
                   onClick={() => void handleConfirmSend()}

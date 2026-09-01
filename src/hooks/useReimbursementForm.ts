@@ -103,6 +103,11 @@ export function useReimbursementForm() {
     requesterAddress: "",
     requesterDocument: "",
     requesterEmail: "",
+    bankName: "",
+    bankAgency: "",
+    bankAccount: "",
+    bankAccountType: "",
+    bankAccountHolder: "",
     expenses: [createEmptyExpense(1)],
   });
 
@@ -450,6 +455,13 @@ export function useReimbursementForm() {
     if (!formData.requesterName.trim()) newErrors.requesterName = "Nome é obrigatório";
     if (!formData.requesterEmail.trim()) newErrors.requesterEmail = "Email é obrigatório";
     if (!formData.requesterDocument.trim()) newErrors.requesterDocument = "CPF/CNPJ é obrigatório";
+    if (!formData.bankName.trim()) newErrors.bankName = "Banco é obrigatório";
+    if (!formData.bankAgency.trim()) newErrors.bankAgency = "Agência é obrigatória";
+    if (!formData.bankAccount.trim()) newErrors.bankAccount = "Conta é obrigatória";
+    if (!formData.bankAccountType.trim()) newErrors.bankAccountType = "Tipo de conta é obrigatório";
+    if (!formData.bankAccountHolder.trim()) {
+      newErrors.bankAccountHolder = "Titular da conta é obrigatório";
+    }
 
     const activeExpenses = formData.expenses.filter((e) => !isPlaceholderExpense(e));
 
@@ -484,6 +496,11 @@ export function useReimbursementForm() {
       requesterAddress: "",
       requesterDocument: "",
       requesterEmail: "",
+      bankName: "",
+      bankAgency: "",
+      bankAccount: "",
+      bankAccountType: "",
+      bankAccountHolder: "",
       expenses: [createEmptyExpense(1)],
     });
     setErrors({});

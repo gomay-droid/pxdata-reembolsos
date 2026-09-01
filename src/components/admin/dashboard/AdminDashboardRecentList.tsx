@@ -52,7 +52,7 @@ export function AdminDashboardRecentList({
       ) : (
         <ul className="divide-y divide-border/70">
           {recent.map((r) => {
-            const ui = REIMBURSEMENT_STATUS_UI[r.status];
+            const ui = REIMBURSEMENT_STATUS_UI[r.status] ?? REIMBURSEMENT_STATUS_UI.enviado;
             const isDeleting = deletingReimbursementId === r.id;
             return (
               <li key={r.id} className="flex items-center gap-1">

@@ -13,6 +13,8 @@ import {
   adminReimbursementDetailInclude,
   buildAdminExpenseRowsForJson,
 } from "./buildAdminReimbursementDetail";
+import { parseStatusQuery } from "../src/lib/reimbursementStatus.ts";
+import { BANK_ACCOUNT_TYPES, BANK_DATA_PLACEHOLDER } from "../src/lib/bankDetails.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -452,6 +454,11 @@ async function buildSpreadsheetForDbId(dbId: number) {
     requesterAddress: reimbursement.requesterAddress,
     requesterDocument: reimbursement.requesterDocument,
     requesterEmail: reimbursement.requesterEmail,
+    bankName: reimbursement.bankName,
+    bankAgency: reimbursement.bankAgency,
+    bankAccount: reimbursement.bankAccount,
+    bankAccountType: reimbursement.bankAccountType,
+    bankAccountHolder: reimbursement.bankAccountHolder,
     company: {
       name: company.name,
       address: company.address,
@@ -553,14 +560,31 @@ type PayloadBody = {
   requesterAddress?: string;
   requesterDocument: string;
   requesterEmail: string;
+  bankName: string;
+  bankAgency: string;
+  bankAccount: string;
+  bankAccountType: string;
+  bankAccountHolder: string;
   expenses: PayloadExpense[];
 };
+
+const ALLOWED_REIMBURSEMENT_STATUSES = ["enviado", "aprovado", "rejeitado", "contestado"] as const;
+const ALLOWED_BANK_ACCOUNT_TYPES = BANK_ACCOUNT_TYPES.map((t) => t.value);
+
+function requireBankField(value: unknown, label: string): string | null {
+  const text = String(value ?? "").trim();
+  if (!text || text.toLowerCase() === BANK_DATA_PLACEHOLDER) {
+    return `${label} é obrigatório`;
+  }
+  return null;
+}
 
 app.get("/api/reimbursements", requireAuth, async (req, res) => {
   const sub = req.session.user!.sub;
   try {
+    const status = parseStatusQuery(req.query.status);
     const rows = await prisma.reimbursement.findMany({
-      where: { ownerGoogleSub: sub },
+      where: { ownerGoogleSub: sub, ...(status ? { status } : {}) },
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { expenses: true } } },
     });
@@ -570,7 +594,7 @@ app.get("/api/reimbursements", requireAuth, async (req, res) => {
       requesterEmail: r.requesterEmail,
       totalAmount: r.totalAmount,
       expenseCount: r._count.expenses,
-      status: r.status as "enviado" | "aprovado" | "rejeitado",
+      status: r.status,
       // ISO completo: o front formata no fuso local (slice só em UTC gerava “um dia à frente” à noite no BR)
       createdAt: r.createdAt.toISOString(),
     }));
@@ -603,6 +627,19 @@ app.post(
     }
     if (!payload.requesterDocument?.trim()) {
       return res.status(400).json({ error: "CPF/CNPJ é obrigatório" });
+    }
+    const bankErrors = [
+      requireBankField(payload.bankName, "Banco"),
+      requireBankField(payload.bankAgency, "Agência"),
+      requireBankField(payload.bankAccount, "Conta"),
+      requireBankField(payload.bankAccountHolder, "Titular da conta"),
+    ].filter(Boolean);
+    if (bankErrors.length > 0) {
+      return res.status(400).json({ error: bankErrors[0] });
+    }
+    const bankAccountType = String(payload.bankAccountType ?? "").trim();
+    if (!ALLOWED_BANK_ACCOUNT_TYPES.includes(bankAccountType as (typeof ALLOWED_BANK_ACCOUNT_TYPES)[number])) {
+      return res.status(400).json({ error: "Tipo de conta é obrigatório" });
     }
     if (!Array.isArray(payload.expenses) || payload.expenses.length === 0) {
       return res.status(400).json({ error: "Inclua pelo menos uma despesa" });
@@ -648,6 +685,11 @@ app.post(
           requesterAddress: payload.requesterAddress?.trim() || null,
           requesterDocument: payload.requesterDocument.trim(),
           requesterEmail: payload.requesterEmail.trim(),
+          bankName: payload.bankName.trim(),
+          bankAgency: payload.bankAgency.trim(),
+          bankAccount: payload.bankAccount.trim(),
+          bankAccountType,
+          bankAccountHolder: payload.bankAccountHolder.trim(),
           totalAmount,
           expenses: {
             create: payload.expenses.map((e) => ({
@@ -731,7 +773,7 @@ app.patch("/api/reimbursements/:id/status", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "ID inválido" });
   }
   const status = req.body?.status as string | undefined;
-  if (!status || !["enviado", "aprovado", "rejeitado"].includes(status)) {
+  if (!status || !ALLOWED_REIMBURSEMENT_STATUSES.includes(status as (typeof ALLOWED_REIMBURSEMENT_STATUSES)[number])) {
     return res.status(400).json({ error: "Status inválido" });
   }
   try {
@@ -755,7 +797,9 @@ app.patch("/api/reimbursements/:id/status", requireAuth, async (req, res) => {
 app.get("/api/admin/reimbursements", requireAuth, requireAdmin, async (req, res) => {
   try {
     // Sem filtro por owner: admin vê TODOS os reembolsos de todos os usuários.
+    const status = parseStatusQuery(req.query.status);
     const rows = await prisma.reimbursement.findMany({
+      where: status ? { status } : undefined,
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { expenses: true } } },
     });
@@ -766,7 +810,7 @@ app.get("/api/admin/reimbursements", requireAuth, requireAdmin, async (req, res)
       requesterEmail: r.requesterEmail,
       totalAmount: r.totalAmount,
       expenseCount: r._count.expenses,
-      status: r.status as "enviado" | "aprovado" | "rejeitado",
+      status: r.status,
       createdAt: r.createdAt.toISOString(),
     }));
 
@@ -798,6 +842,11 @@ app.get("/api/admin/reimbursements/:id", requireAuth, requireAdmin, async (req, 
       requesterEmail: r.requesterEmail,
       requesterDocument: r.requesterDocument,
       requesterAddress: r.requesterAddress,
+      bankName: r.bankName,
+      bankAgency: r.bankAgency,
+      bankAccount: r.bankAccount,
+      bankAccountType: r.bankAccountType,
+      bankAccountHolder: r.bankAccountHolder,
       status: r.status,
       totalAmount: r.totalAmount,
       createdAt: r.createdAt.toISOString(),
@@ -882,7 +931,7 @@ app.patch("/api/admin/reimbursements/:id/status", requireAuth, requireAdmin, asy
     return res.status(400).json({ error: "ID inválido" });
   }
   const status = req.body?.status as string | undefined;
-  if (!status || !["enviado", "aprovado", "rejeitado"].includes(status)) {
+  if (!status || !ALLOWED_REIMBURSEMENT_STATUSES.includes(status as (typeof ALLOWED_REIMBURSEMENT_STATUSES)[number])) {
     return res.status(400).json({ error: "Status inválido" });
   }
 

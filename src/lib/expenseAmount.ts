@@ -37,6 +37,11 @@ const VALIDATION_LABELS: Record<string, string> = {
   requesterName: "Nome do solicitante",
   requesterEmail: "E-mail do solicitante",
   requesterDocument: "CPF/CNPJ do solicitante",
+  bankName: "Banco",
+  bankAgency: "Agência",
+  bankAccount: "Conta",
+  bankAccountType: "Tipo de conta",
+  bankAccountHolder: "Titular da conta",
   expenses_empty: "Pelo menos uma despesa",
 };
 

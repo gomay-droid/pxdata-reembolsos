@@ -36,7 +36,9 @@ import { FuelExpenseFields } from "@/components/reimbursement/FuelExpenseFields"
 import { isFuelExpenseLine } from "@/lib/fuelConsumption";
 import { resolveFuelConsumptionLimits } from "@/lib/fuelConfig";
 import type { CompanyProfile } from "@/types/company";
-import { apiUrl, assetUrl } from "@/lib/apiBase";
+import { ReimbursementStatusFilter } from "@/components/reimbursement/ReimbursementStatusFilter";
+import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
+import { bankAccountTypeLabel, isBankDataPlaceholder } from "@/lib/bankDetails";
 
 type AdminTab = "despesas" | "dashboard" | "empresa";
 
@@ -54,6 +56,11 @@ type AdminReimbursementDetails = {
   requesterEmail: string;
   requesterDocument: string;
   requesterAddress?: string | null;
+  bankName?: string;
+  bankAgency?: string;
+  bankAccount?: string;
+  bankAccountType?: string;
+  bankAccountHolder?: string;
   status: Reimbursement["status"];
   totalAmount: number;
   createdAt: string;
@@ -101,6 +108,7 @@ export default function AdminPage() {
   );
 
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
+  const [statusFilter, setStatusFilter] = useState<"all" | ReimbursementStatus>("all");
   const [loadingExpenses, setLoadingExpenses] = useState(false);
   const [expensesLoaded, setExpensesLoaded] = useState(false);
   const [selected, setSelected] = useState<AdminReimbursementDetails | null>(null);
@@ -237,7 +245,8 @@ export default function AdminPage() {
   const loadExpenses = useCallback(async () => {
     setLoadingExpenses(true);
     try {
-      const res = await fetch(apiUrl("/api/admin/reimbursements"), {
+      const query = statusFilter === "all" ? "" : `?status=${encodeURIComponent(statusFilter)}`;
+      const res = await fetch(apiUrl(`/api/admin/reimbursements${query}`), {
         credentials: "include",
         cache: "no-store",
       });
@@ -256,7 +265,7 @@ export default function AdminPage() {
       setLoadingExpenses(false);
       setExpensesLoaded(true);
     }
-  }, []);
+  }, [statusFilter]);
 
   const openDetails = useCallback(async (r: Reimbursement) => {
     setLoadingSelected(true);
@@ -416,7 +425,7 @@ export default function AdminPage() {
       void loadMetrics();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só reagir a mudança de aba/admin
-  }, [isAdmin, tab]);
+  }, [isAdmin, tab, statusFilter]);
 
   useEffect(() => {
     if (!user && !loading) {
@@ -552,6 +561,9 @@ export default function AdminPage() {
 
         {tab === "despesas" && (
           <section className="space-y-4">
+            <div className="sm:max-w-xs">
+              <ReimbursementStatusFilter value={statusFilter} onChange={setStatusFilter} />
+            </div>
             {loadingExpenses ? (
               <div className="flex justify-center py-12 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -649,6 +661,47 @@ export default function AdminPage() {
                   <p className="text-sm text-foreground mt-1">{selected.requesterAddress}</p>
                 </div>
               )}
+
+              <div
+                className={`rounded-2xl border p-4 space-y-3 ${
+                  [selected.bankName, selected.bankAgency, selected.bankAccount, selected.bankAccountType, selected.bankAccountHolder].some(
+                    (v) => isBankDataPlaceholder(v)
+                  )
+                    ? "border-amber-500/40 bg-amber-500/5"
+                    : "border-border bg-background"
+                }`}
+              >
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Dados bancários</p>
+                {[selected.bankName, selected.bankAgency, selected.bankAccount, selected.bankAccountType, selected.bankAccountHolder].some(
+                  (v) => isBankDataPlaceholder(v)
+                ) && (
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Dado não informado nesta solicitação antiga — confirmar por fora do sistema.
+                  </p>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Banco: </span>
+                    {selected.bankName ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Agência: </span>
+                    {selected.bankAgency ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Conta: </span>
+                    {selected.bankAccount ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Tipo: </span>
+                    {bankAccountTypeLabel(selected.bankAccountType)}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">Titular: </span>
+                    {selected.bankAccountHolder ?? "—"}
+                  </p>
+                </div>
+              </div>
 
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3">

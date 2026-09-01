@@ -2,18 +2,23 @@ import { expenseLineOptionsWithCurrent } from "@/lib/expenseCatalog";
 import { expenseLineTotal } from "@/lib/expenseAmount";
 import { isFuelExpenseLine } from "@/lib/fuelConsumption";
 import type { FuelConsumptionLimits } from "@/lib/fuelConfig";
-import { Expense } from "@/types/reimbursement";
+import type { Expense, ReimbursementFormData } from "@/types/reimbursement";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FuelExpenseFields } from "@/components/reimbursement/FuelExpenseFields";
-import { AlertTriangle, ClipboardCheck, DollarSign, FileText } from "lucide-react";
+import { BANK_ACCOUNT_TYPES } from "@/lib/bankDetails";
 
 interface Props {
   expenses: Expense[];
   requesterName: string;
   requesterEmail: string;
   requesterDocument: string;
+  bankName: string;
+  bankAgency: string;
+  bankAccount: string;
+  bankAccountType: string;
+  bankAccountHolder: string;
   errors: Record<string, string>;
   totalAmount: number;
   expenseLineOptions: string[];
@@ -22,10 +27,7 @@ interface Props {
   onUpdate: (id: number, field: keyof Omit<Expense, "id" | "attachments">, value: string) => void;
   onExpenseLineChange: (id: number, expenseLine: string) => void;
   onCnpjConfirmedChange: (id: number, checked: boolean) => void;
-  onRequesterUpdate: (
-    field: "requesterName" | "requesterEmail" | "requesterDocument",
-    value: string
-  ) => void;
+  onRequesterUpdate: (field: keyof Omit<ReimbursementFormData, "expenses">, value: string) => void;
   reviewed: boolean;
   onReviewedChange: (checked: boolean) => void;
   className?: string;
@@ -37,6 +39,11 @@ export function ReimbursementReviewSection({
   requesterName,
   requesterEmail,
   requesterDocument,
+  bankName,
+  bankAgency,
+  bankAccount,
+  bankAccountType,
+  bankAccountHolder,
   errors,
   totalAmount,
   expenseLineOptions,
@@ -54,7 +61,12 @@ export function ReimbursementReviewSection({
   const hasRequesterErrors =
     Boolean(errors.requesterName) ||
     Boolean(errors.requesterEmail) ||
-    Boolean(errors.requesterDocument);
+    Boolean(errors.requesterDocument) ||
+    Boolean(errors.bankName) ||
+    Boolean(errors.bankAgency) ||
+    Boolean(errors.bankAccount) ||
+    Boolean(errors.bankAccountType) ||
+    Boolean(errors.bankAccountHolder);
 
   return (
     <div className={className ?? "rounded-2xl border border-border bg-card p-6 md:p-8 space-y-5"}>
@@ -110,6 +122,67 @@ export function ReimbursementReviewSection({
             />
             {errors.requesterDocument && (
               <p className="text-xs text-destructive">{errors.requesterDocument}</p>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">Banco *</Label>
+            <Input
+              value={bankName}
+              onChange={(e) => onRequesterUpdate("bankName", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.bankName && <p className="text-xs text-destructive">{errors.bankName}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">Agência *</Label>
+            <Input
+              value={bankAgency}
+              onChange={(e) => onRequesterUpdate("bankAgency", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.bankAgency && <p className="text-xs text-destructive">{errors.bankAgency}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">Conta *</Label>
+            <Input
+              value={bankAccount}
+              onChange={(e) => onRequesterUpdate("bankAccount", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.bankAccount && <p className="text-xs text-destructive">{errors.bankAccount}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">Tipo de conta *</Label>
+            <Select
+              value={bankAccountType || undefined}
+              onValueChange={(v) => onRequesterUpdate("bankAccountType", v)}
+            >
+              <SelectTrigger className="h-11 bg-card border-border font-light rounded-full">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {BANK_ACCOUNT_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.bankAccountType && (
+              <p className="text-xs text-destructive">{errors.bankAccountType}</p>
+            )}
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label className="text-sm text-muted-foreground">Titular da conta *</Label>
+            <Input
+              value={bankAccountHolder}
+              onChange={(e) => onRequesterUpdate("bankAccountHolder", e.target.value)}
+              className="h-11 bg-card border-border font-light"
+            />
+            {errors.bankAccountHolder && (
+              <p className="text-xs text-destructive">{errors.bankAccountHolder}</p>
             )}
           </div>
         </div>

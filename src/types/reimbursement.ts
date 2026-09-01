@@ -60,6 +60,11 @@ export interface ReimbursementFormData {
   requesterAddress: string;
   requesterDocument: string;
   requesterEmail: string;
+  bankName: string;
+  bankAgency: string;
+  bankAccount: string;
+  bankAccountType: string;
+  bankAccountHolder: string;
   expenses: Expense[];
 }
 
@@ -69,7 +74,7 @@ export interface Reimbursement {
   requesterEmail: string;
   totalAmount: number;
   expenseCount: number;
-  status: "enviado" | "aprovado" | "rejeitado";
+  status: "enviado" | "aprovado" | "rejeitado" | "contestado";
   createdAt: string;
 }
 

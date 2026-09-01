@@ -28,6 +28,11 @@ model Reimbursement {
   requesterAddress  String?
   requesterDocument String
   requesterEmail    String
+  bankName          String       @default("não informado")
+  bankAgency        String       @default("não informado")
+  bankAccount       String       @default("não informado")
+  bankAccountType   String       @default("não informado")
+  bankAccountHolder String       @default("não informado")
   status            String       @default("enviado")
   totalAmount       Float
   createdAt         DateTime     @default(now())

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ReimbursementForm from "@/components/reimbursement/ReimbursementForm";
 import { ReimbursementList } from "@/components/reimbursement/ReimbursementList";
+import { ReimbursementStatusFilter } from "@/components/reimbursement/ReimbursementStatusFilter";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +12,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogoMark } from "@/components/BrandLogoMark";
 import { apiUrl } from "@/lib/apiBase";
+import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
 
 type View = "form" | "list";
 
@@ -34,6 +36,7 @@ const Index = () => {
   const [loadingList, setLoadingList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | ReimbursementStatus>("all");
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [companyLoading, setCompanyLoading] = useState(false);
 
@@ -41,7 +44,8 @@ const Index = () => {
     setLoadingList(true);
     setListError(null);
     try {
-      const res = await fetch(apiUrl("/api/reimbursements"), { credentials: "include" });
+      const query = statusFilter === "all" ? "" : `?status=${encodeURIComponent(statusFilter)}`;
+      const res = await fetch(apiUrl(`/api/reimbursements${query}`), { credentials: "include" });
       if (res.status === 401) {
         setReimbursements([]);
         setListError(null);
@@ -57,7 +61,7 @@ const Index = () => {
     } finally {
       setLoadingList(false);
     }
-  }, [refresh]);
+  }, [refresh, statusFilter]);
 
   useEffect(() => {
     const authError = searchParams.get("auth_error");
@@ -76,7 +80,7 @@ const Index = () => {
     if (user && view === "list") {
       void loadReimbursements();
     }
-  }, [view, user, loadReimbursements]);
+  }, [view, user, loadReimbursements, statusFilter]);
 
   useEffect(() => {
     if (!user) return;
@@ -162,22 +166,18 @@ const Index = () => {
               <List className="h-4 w-4" />
               <span className="hidden sm:inline">Histórico</span>
             </Button>
+            {isAdmin ? (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                if (isAdmin) {
-                  navigate("/admin");
-                  return;
-                }
-                toast.error("Você não tem autorização para acessar a página de Administração.");
-              }}
+              onClick={() => navigate("/admin")}
               className="h-9 w-9 p-0"
               title="Administração"
               aria-label="Administração"
             >
               <Settings className="h-4 w-4" />
             </Button>
+            ) : null}
             <Button
               variant="ghost"
               size="sm"
@@ -237,6 +237,9 @@ const Index = () => {
                   <Plus className="h-4 w-4" />
                   Nova solicitação
                 </Button>
+              </div>
+              <div className="sm:max-w-xs sm:ml-auto">
+                <ReimbursementStatusFilter value={statusFilter} onChange={setStatusFilter} />
               </div>
             </div>
             {listError && <p className="text-sm text-destructive">{listError}</p>}

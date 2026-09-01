@@ -233,11 +233,10 @@ export function ExpensesSection({
                     )}
                     <span className="text-sm font-medium text-foreground truncate">
                       Item {index + 1}
+                      {` · ${expense.description?.trim() || "Sem descrição"}`}
                       {expense.attachments.length > 0
                         ? ` · ${expense.attachments.length} anexo(s)`
-                        : expense.description?.trim()
-                          ? ` · ${expense.description.trim()}`
-                          : ""}
+                        : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
