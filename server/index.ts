@@ -543,10 +543,35 @@ const receiptUpload = multer({
   },
 });
 
+function parseExpenseDate(raw: unknown): Date {
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw.trim())) {
+    const d = new Date(`${raw.trim().slice(0, 10)}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+async function ensureSqlitePixKeyColumn(): Promise<void> {
+  try {
+    const cols = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+      `PRAGMA table_info("Reimbursement")`
+    );
+    if (!cols.some((c) => c.name === "pixKey")) {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "Reimbursement" ADD COLUMN "pixKey" TEXT NOT NULL DEFAULT 'não informado'`
+      );
+      console.log("[db] coluna pixKey criada (fallback da migration)");
+    }
+  } catch (e) {
+    console.error("[db] falha ao garantir coluna pixKey:", e);
+  }
+}
+
 type PayloadExpense = {
   description: string;
   expenseLine: string;
   accountCode?: string;
+  expenseDate?: string;
   amount: string | number;
   observation?: string;
   /** Quantidade de arquivos desta despesa (ordem sequencial em files[]). */
@@ -704,6 +729,7 @@ app.post(
               description: e.description.trim(),
               expenseLine: e.expenseLine,
               accountCode: e.accountCode?.trim() || null,
+              expenseDate: parseExpenseDate(e.expenseDate),
               amount:
                 typeof e.amount === "string" ? parseFloat(e.amount) : Number(e.amount),
               observation: e.observation?.trim() || BANK_DATA_PLACEHOLDER,
@@ -768,7 +794,7 @@ app.post(
         expenseCount: payload.expenses.length,
       });
     } catch (e) {
-      console.error(e);
+      console.error("[reimbursements] falha ao salvar:", e);
       res.status(500).json({ error: "Erro ao salvar reembolso" });
     }
   }
@@ -1085,6 +1111,10 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(400).json({ error: message });
 });
 
-app.listen(PORT, () => {
-  console.log(`API em http://127.0.0.1:${PORT}`);
-});
+ensureSqlitePixKeyColumn()
+  .catch((e) => console.error("[db] ensureSqlitePixKeyColumn:", e))
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`API em http://127.0.0.1:${PORT}`);
+    });
+  });

@@ -46,6 +46,14 @@ function applyExpenseLineToItem(
   return { expense: next, dynamicLine: { line, code } };
 }
 
+function todayExpenseDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function nextExpenseId(expenses: Expense[]): number {
   if (expenses.length === 0) return 1;
   return Math.max(...expenses.map((e) => e.id)) + 1;
@@ -65,6 +73,7 @@ function buildBulkAppend(
     description: "",
     expenseLine: "",
     accountCode: "",
+    expenseDate: todayExpenseDate(),
     amount: "",
     amountUsd: "",
     supplierCnpj: "",
@@ -87,6 +96,7 @@ const createEmptyExpense = (id: number): Expense => ({
   description: "",
   expenseLine: "",
   accountCode: "",
+  expenseDate: todayExpenseDate(),
   amount: "",
   amountUsd: "",
   supplierCnpj: "",
