@@ -331,6 +331,34 @@ export default function AdminPage() {
     }
   }, []);
 
+  const downloadAttachment = useCallback(
+    async (attachment: AdminReimbursementDetails["expenses"][number]["attachments"][number]) => {
+      try {
+        const res = await fetch(assetUrl(attachment.url), { credentials: "include" });
+        if (!res.ok) {
+          toast.error("Não foi possível baixar o comprovante");
+          return;
+        }
+        const contentType = res.headers.get("Content-Type") ?? "";
+        if (contentType.includes("text/html")) {
+          toast.error("Comprovante indisponível. Verifique se a API está configurada corretamente.");
+          return;
+        }
+        const buffer = await res.arrayBuffer();
+        const blob = new Blob([buffer], { type: attachment.mimeType || contentType });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = attachment.originalName;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast.error("Falha ao baixar o comprovante");
+      }
+    },
+    []
+  );
+
   const sendReimbursementToFinance = useCallback(async (reimbursementId: string) => {
     setSendingToFinance(true);
     try {
@@ -856,12 +884,16 @@ export default function AdminPage() {
                                   className="flex items-center justify-between gap-3 text-sm"
                                 >
                                   <span className="truncate text-foreground">{a.originalName}</span>
-                                  <a href={assetUrl(a.url)} download target="_blank" rel="noreferrer" className="shrink-0">
-                                    <Button type="button" size="sm" variant="secondary" className="gap-1.5 h-8">
-                                      <Download className="h-3.5 w-3.5" />
-                                      Baixar
-                                    </Button>
-                                  </a>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    className="gap-1.5 h-8 shrink-0"
+                                    onClick={() => void downloadAttachment(a)}
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    Baixar
+                                  </Button>
                                 </div>
                               ))}
                             </div>
