@@ -40,7 +40,7 @@ import { ReimbursementStatusFilter } from "@/components/reimbursement/Reimbursem
 import type { ReimbursementStatus } from "@/lib/reimbursementStatus";
 import { bankAccountTypeLabel, isBankDataPlaceholder } from "@/lib/bankDetails";
 import { fetchIsAdmin, fetchWithRetry, isAbortError } from "@/lib/fetchIsAdmin";
-import { apiUrl, assetUrl } from "@/lib/apiBase";
+import { apiUrl } from "@/lib/apiBase";
 
 type AdminTab = "despesas" | "dashboard" | "empresa";
 
@@ -333,13 +333,45 @@ export default function AdminPage() {
 
   const downloadAttachment = useCallback(
     async (attachment: AdminReimbursementDetails["expenses"][number]["attachments"][number]) => {
+      const fetchUrl = apiUrl(`/api/admin/attachments/${attachment.id}/download`);
+      // #region agent log
+      fetch("http://127.0.0.1:7287/ingest/3d52e186-e047-4d27-b86f-b5380ce6654a", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "4a64e3" },
+        body: JSON.stringify({
+          sessionId: "4a64e3",
+          runId: "post-fix",
+          hypothesisId: "H1",
+          location: "AdminPage.tsx:downloadAttachment:start",
+          message: "attachment download start",
+          data: { attachmentId: attachment.id, legacyUrl: attachment.url, fetchUrl },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       try {
-        const res = await fetch(assetUrl(attachment.url), { credentials: "include" });
+        const res = await fetch(fetchUrl, { credentials: "include" });
+        const contentType = res.headers.get("Content-Type") ?? "";
+        // #region agent log
+        fetch("http://127.0.0.1:7287/ingest/3d52e186-e047-4d27-b86f-b5380ce6654a", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "4a64e3" },
+          body: JSON.stringify({
+            sessionId: "4a64e3",
+            runId: "post-fix",
+            hypothesisId: "H2",
+            location: "AdminPage.tsx:downloadAttachment:response",
+            message: "attachment download response",
+            data: { status: res.status, ok: res.ok, contentType, fetchUrl },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         if (!res.ok) {
-          toast.error("Não foi possível baixar o comprovante");
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          toast.error(data.error ?? "Não foi possível baixar o comprovante");
           return;
         }
-        const contentType = res.headers.get("Content-Type") ?? "";
         if (contentType.includes("text/html")) {
           toast.error("Comprovante indisponível. Verifique se a API está configurada corretamente.");
           return;
