@@ -912,6 +912,35 @@ app.get("/api/admin/reimbursements/:id/spreadsheet", requireAuth, requireAdmin, 
   }
 });
 
+app.get("/api/admin/attachments/:id/download", requireAuth, requireAdmin, async (req, res) => {
+  const attachmentId = Number.parseInt(req.params.id, 10);
+  if (!Number.isFinite(attachmentId)) {
+    return res.status(400).json({ error: "ID do anexo inválido" });
+  }
+  try {
+    const att = await prisma.attachment.findUnique({ where: { id: attachmentId } });
+    if (!att) return res.status(404).json({ error: "Comprovante não encontrado" });
+
+    const abs = path.resolve(rootDir, att.storedPath);
+    const uploadsRoot = path.resolve(uploadsDir);
+    if (!abs.startsWith(uploadsRoot + path.sep) && abs !== uploadsRoot) {
+      return res.status(400).json({ error: "Caminho do comprovante inválido" });
+    }
+    if (!fs.existsSync(abs)) {
+      return res.status(404).json({ error: "Arquivo do comprovante não encontrado no servidor" });
+    }
+
+    const safeName =
+      att.originalName.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").trim() || "comprovante";
+    res.setHeader("Content-Type", att.mimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.sendFile(abs);
+  } catch (e) {
+    console.error("[admin/attachment-download]", e);
+    res.status(500).json({ error: "Erro ao baixar comprovante" });
+  }
+});
+
 app.post(
   "/api/admin/reimbursements/:id/send-to-finance",
   requireAuth,
